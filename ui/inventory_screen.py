@@ -8,7 +8,8 @@ from PySide6.QtGui import QColor
 from models.part import Part
 from models.user import User
 from managers.inventory_manager import (
-    get_all_parts, search_parts, add_part, update_part, record_stock_in, deactivate_part
+    get_all_parts, search_parts, add_part, update_part, record_stock_in,
+    record_stock_adjustment, deactivate_part
 )
 from managers.supplier_manager import get_all_suppliers
 from ui.excel_import_dialog import ExcelImportDialog
@@ -149,6 +150,48 @@ class StockInDialog(QDialog):
         btn_layout.addWidget(self.cancel_btn)
         layout.addLayout(btn_layout)
 
+class AdjustStockDialog(QDialog):
+    """FR-15: manual stock adjustment, e.g. after a physical stock take."""
+    def __init__(self, parent=None, part=None):
+        super().__init__(parent)
+        self.part = part
+        self.setWindowTitle(f"Adjust Stock: {part.name} ({part.part_number})")
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(f"Current Stock: {self.part.quantity_on_hand}"))
+
+        form = QFormLayout()
+        self.delta = QSpinBox()
+        self.delta.setRange(-100000, 100000)
+        self.delta.setValue(0)
+        form.addRow("Adjustment (+/-):", self.delta)
+
+        self.reason = QLineEdit()
+        self.reason.setPlaceholderText("e.g. Physical count correction, damaged stock...")
+        form.addRow("Reason:", self.reason)
+
+        layout.addLayout(form)
+
+        btn_layout = QHBoxLayout()
+        self.save_btn = QPushButton("Confirm Adjustment")
+        self.save_btn.clicked.connect(self.validate_and_accept)
+        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(self.save_btn)
+        btn_layout.addWidget(self.cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def validate_and_accept(self):
+        if self.delta.value() == 0:
+            QMessageBox.warning(self, "Validation Error", "Adjustment cannot be zero.")
+            return
+        if not self.reason.text().strip():
+            QMessageBox.warning(self, "Validation Error", "A reason is required.")
+            return
+        self.accept()
 
 class InventoryScreen(QWidget):
     def __init__(self, current_user: User, parent=None):
@@ -225,9 +268,13 @@ class InventoryScreen(QWidget):
             
             stock_in_btn = QPushButton("Stock In")
             stock_in_btn.clicked.connect(lambda checked, p=part: self.open_stock_in_dialog(p))
-            
+
+            adjust_btn = QPushButton("Adjust Stock")
+            adjust_btn.clicked.connect(lambda checked, p=part: self.open_adjust_dialog(p))
+
             action_layout.addWidget(edit_btn)
             action_layout.addWidget(stock_in_btn)
+            action_layout.addWidget(adjust_btn)
             
             if self.current_user.is_admin():
                 del_btn = QPushButton("Deactivate")
@@ -272,7 +319,20 @@ class InventoryScreen(QWidget):
                 self.load_inventory()
             else:
                 QMessageBox.critical(self, "Error", "Failed to record stock in.")
-
+    def open_adjust_dialog(self, part):
+        dialog = AdjustStockDialog(self, part)
+        if dialog.exec():
+            delta = dialog.delta.value()
+            reason = dialog.reason.text().strip()
+            success, message = record_stock_adjustment(
+                part.part_id, delta, reason, self.current_user.user_id
+            )
+            if success:
+                self.load_inventory()
+                QMessageBox.information(self, "Stock Adjusted", message)
+            else:
+                QMessageBox.critical(self, "Adjustment Failed", message)
+                
     def open_excel_import(self):
         dialog = ExcelImportDialog(self)
         dialog.import_complete.connect(self.load_inventory)

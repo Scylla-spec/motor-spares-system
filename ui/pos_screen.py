@@ -91,6 +91,12 @@ class POSScreen(QWidget):
         self.checkout_btn.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold; font-size: 16px;")
         self.checkout_btn.clicked.connect(self.checkout)
         checkout_layout.addWidget(self.checkout_btn)
+
+        self.cancel_sale_btn = QPushButton("Cancel Sale")
+        self.cancel_sale_btn.setMinimumHeight(36)
+        self.cancel_sale_btn.setStyleSheet("background-color: #c0392b; color: white; font-weight: bold;")
+        self.cancel_sale_btn.clicked.connect(self.cancel_sale)
+        checkout_layout.addWidget(self.cancel_sale_btn)
         
         right_layout.addLayout(checkout_layout)
         
@@ -188,7 +194,21 @@ class POSScreen(QWidget):
         if part_id in self.cart_items:
             del self.cart_items[part_id]
             self.update_cart_display()
-
+    def cancel_sale(self):
+        """FR-16 / BR-07: discards the entire in-progress cart. Since nothing is
+        written to the database until checkout (BR-06), this has zero effect on
+        inventory or reports — it's a pure UI reset."""
+        if not self.cart_items:
+            return
+        confirm = QMessageBox.question(
+            self, "Cancel Sale",
+            "Discard the current cart? This cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if confirm == QMessageBox.Yes:
+            self.cart_items.clear()
+            self.update_cart_display()
+            
     def checkout(self):
         if not self.cart_items:
             QMessageBox.warning(self, "Empty Cart", "Cannot checkout an empty cart.")
