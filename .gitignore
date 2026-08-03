@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.db
+venv/
+.env
+.vscode/
+.idea/
+logs/
+backups/
+exports/
+receipts/

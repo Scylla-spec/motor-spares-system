@@ -1,0 +1,7 @@
+PySide6
+reportlab
+pytest
+bcrypt
+openpyxl
+thefuzz
+python-Levenshtein
