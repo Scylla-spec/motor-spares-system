@@ -6,13 +6,13 @@ from reportlab.pdfgen import canvas
 from models.sale import Sale
 
 RECEIPTS_DIR = "receipts"
-os.makedirs(RECEIPTS_DIR, exist_ok=True)
 
 def generate_pdf_receipt(sale: Sale, receipt_number: str, cashier_name: str, customer_name: str = "Walk-in") -> str:
     """
     Generates a PDF receipt for a sale and saves it to the receipts directory.
     Returns the absolute path to the generated PDF.
     """
+    os.makedirs(RECEIPTS_DIR, exist_ok=True)
     filename = f"{receipt_number}.pdf"
     filepath = os.path.join(RECEIPTS_DIR, filename)
     
