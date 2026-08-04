@@ -163,3 +163,12 @@ def initialize_database():
 
 if __name__ == "__main__":
     initialize_database()
+    # --- Migration: add account-lockout columns to User if they don't exist yet ---
+        # (Safe to re-run: checks first, so it won't error on a fresh DB that
+        # already has them, or a pre-existing DB that doesn't.)
+        cursor.execute("PRAGMA table_info(User);")
+        existing_columns = {row[1] for row in cursor.fetchall()}
+        if "failed_attempts" not in existing_columns:
+            cursor.execute("ALTER TABLE User ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0;")
+        if "locked_until" not in existing_columns:
+            cursor.execute("ALTER TABLE User ADD COLUMN locked_until TEXT;")

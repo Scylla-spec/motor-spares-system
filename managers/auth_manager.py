@@ -2,9 +2,13 @@ import hashlib
 import os
 import sqlite3
 import logging
-from typing import Optional
+from typing import Optional, Tuple
+from datetime import datetime, timedelta
 from database.db_manager import get_connection
 from models.user import User
+
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_MINUTES = 5
 
 
 def hash_password(password: str, salt: bytes = None) -> str:
@@ -52,14 +56,49 @@ def ensure_default_admin():
         conn.close()
 
 
-def authenticate_user(username: str, password: str) -> Optional[User]:
-    """Authenticates a user against the database. Returns User object or None."""
+def authenticate_user(username: str, password: str) -> Tuple[Optional[User], str]:
+    """
+    Authenticates a user against the database.
+
+    Enforces account lockout after MAX_FAILED_ATTEMPTS consecutive failures:
+    the account is locked for LOCKOUT_MINUTES, during which login is rejected
+    even with the correct password.
+
+    Returns (User_or_None, message). message is empty on success, otherwise
+    explains why login failed (wrong credentials vs. locked out) so the UI
+    can show something more useful than a generic error.
+    """
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT user_id, username, password_hash, role FROM User WHERE username = ?;", (username,))
+        cursor.execute(
+            "SELECT user_id, username, password_hash, role, failed_attempts, locked_until "
+            "FROM User WHERE username = ?;",
+            (username,)
+        )
         row = cursor.fetchone()
-        if row and verify_password(row["password_hash"], password):
+
+        if not row:
+            # Don't reveal whether the username exists.
+            logging.warning(f"Failed login attempt for unknown username '{username}'.")
+            return None, "Invalid username or password."
+
+        # Check for an active lockout first.
+        if row["locked_until"]:
+            locked_until = datetime.fromisoformat(row["locked_until"])
+            if datetime.now() < locked_until:
+                remaining = int((locked_until - datetime.now()).total_seconds() / 60) + 1
+                logging.warning(f"Login attempt on locked account '{username}'.")
+                return None, f"Account locked due to repeated failed logins. Try again in {remaining} minute(s)."
+
+        if verify_password(row["password_hash"], password):
+            # Successful login: clear any failed-attempt counter/lockout.
+            cursor.execute(
+                "UPDATE User SET failed_attempts = 0, locked_until = NULL WHERE user_id = ?;",
+                (row["user_id"],)
+            )
+            conn.commit()
+
             user = User(
                 user_id=row["user_id"],
                 username=row["username"],
@@ -67,13 +106,32 @@ def authenticate_user(username: str, password: str) -> Optional[User]:
                 role=row["role"]
             )
             logging.info(f"User '{username}' logged in successfully.")
-            return user
+            return user, ""
+
+        # Wrong password: increment the counter, lock the account if the limit is hit.
+        new_attempts = row["failed_attempts"] + 1
+        if new_attempts >= MAX_FAILED_ATTEMPTS:
+            locked_until = (datetime.now() + timedelta(minutes=LOCKOUT_MINUTES)).isoformat()
+            cursor.execute(
+                "UPDATE User SET failed_attempts = 0, locked_until = ? WHERE user_id = ?;",
+                (locked_until, row["user_id"])
+            )
+            conn.commit()
+            logging.warning(f"Account '{username}' locked after {MAX_FAILED_ATTEMPTS} failed attempts.")
+            return None, f"Too many failed attempts. Account locked for {LOCKOUT_MINUTES} minutes."
         else:
-            logging.warning(f"Failed login attempt for username '{username}'.")
-            return None
+            cursor.execute(
+                "UPDATE User SET failed_attempts = ? WHERE user_id = ?;",
+                (new_attempts, row["user_id"])
+            )
+            conn.commit()
+            remaining_tries = MAX_FAILED_ATTEMPTS - new_attempts
+            logging.warning(f"Failed login attempt for username '{username}' ({new_attempts}/{MAX_FAILED_ATTEMPTS}).")
+            return None, f"Invalid username or password. {remaining_tries} attempt(s) remaining before lockout."
+
     except sqlite3.Error as e:
         logging.error(f"Database error during authentication: {e}")
-        return None
+        return None, "A database error occurred. Please try again."
     finally:
         conn.close()
 
@@ -131,8 +189,8 @@ def get_all_users() -> list[User]:
 if __name__ == "__main__":
     ensure_default_admin()
     # Test authentication
-    user = authenticate_user("admin", "admin123")
+    user, message = authenticate_user("admin", "admin123")
     if user:
         print(f"Authentication success! Authenticated: {user}")
     else:
-        print("Authentication failed.")
+        print(f"Authentication failed: {message}")
