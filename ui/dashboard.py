@@ -1,8 +1,10 @@
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QLabel, QPushButton, QStackedWidget, QListWidget, QListWidgetItem
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QLabel, QPushButton, QStackedWidget, QListWidget, QListWidgetItem,
+    QFrame, QTableWidget, QTableWidgetItem, QHeaderView
 )
 from PySide6.QtCore import Qt
+from datetime import date
 from models.user import User
 from ui.user_management_screen import UserManagementScreen
 from ui.inventory_screen import InventoryScreen
@@ -10,6 +12,8 @@ from ui.pos_screen import POSScreen
 from ui.customers_screen import CustomersScreen
 from ui.suppliers_screen import SuppliersScreen
 from ui.reports_screen import ReportsScreen
+from managers.reports_manager import get_daily_sales_summary, get_low_stock_parts
+
 
 class PlaceholderScreen(QWidget):
     def __init__(self, title, parent=None):
@@ -18,6 +22,95 @@ class PlaceholderScreen(QWidget):
         label = QLabel(f"<h2>{title} Screen</h2><p>This module is not yet implemented.</p>")
         label.setAlignment(Qt.AlignCenter)
         layout.addWidget(label)
+
+
+class SummaryCard(QFrame):
+    """A single stat card, e.g. Today's Sales: $240.00"""
+    def __init__(self, title: str, value: str, color: str = "#2c3e50", parent=None):
+        super().__init__(parent)
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {color};
+                border-radius: 8px;
+                padding: 10px;
+            }}
+            QLabel {{ color: white; background: transparent; }}
+        """)
+        self.setMinimumHeight(100)
+        layout = QVBoxLayout(self)
+
+        title_label = QLabel(title)
+        title_label.setStyleSheet("font-size: 13px;")
+        layout.addWidget(title_label)
+
+        self.value_label = QLabel(value)
+        self.value_label.setStyleSheet("font-size: 26px; font-weight: bold;")
+        layout.addWidget(self.value_label)
+
+    def set_value(self, value: str):
+        self.value_label.setText(value)
+
+
+class DashboardScreen(QWidget):
+    """
+    Home / overview screen shown right after login (Section 5.5 of the docs).
+    Shows today's sales, low-stock count, and a quick low-stock list so the
+    owner/cashier gets a useful snapshot before navigating anywhere else.
+    """
+    def __init__(self, current_user: User, parent=None):
+        super().__init__(parent)
+        self.current_user = current_user
+        self.setup_ui()
+        self.refresh()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        layout.addWidget(QLabel(f"<h2>Welcome, {self.current_user.username}</h2>"))
+
+        # --- Summary cards row ---
+        cards_layout = QHBoxLayout()
+        self.sales_card = SummaryCard("Today's Sales Revenue", "$0.00", color="#27ae60")
+        self.transactions_card = SummaryCard("Today's Transactions", "0", color="#2980b9")
+        self.low_stock_card = SummaryCard("Low Stock Items", "0", color="#c0392b")
+
+        cards_layout.addWidget(self.sales_card)
+        cards_layout.addWidget(self.transactions_card)
+        cards_layout.addWidget(self.low_stock_card)
+        layout.addLayout(cards_layout)
+
+        # --- Low stock preview table ---
+        layout.addWidget(QLabel("<h3>Parts Needing Reorder</h3>"))
+        self.low_stock_table = QTableWidget()
+        self.low_stock_table.setColumnCount(4)
+        self.low_stock_table.setHorizontalHeaderLabels(
+            ["Part Number", "Name", "In Stock", "Reorder Level"]
+        )
+        self.low_stock_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.low_stock_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        layout.addWidget(self.low_stock_table)
+
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self.refresh)
+        layout.addWidget(refresh_btn)
+
+    def refresh(self):
+        today_str = date.today().isoformat()
+        summary = get_daily_sales_summary(today_str)
+        self.sales_card.set_value(f"${summary['total_revenue']:.2f}")
+        self.transactions_card.set_value(str(summary['transaction_count']))
+
+        low_stock = get_low_stock_parts()
+        self.low_stock_card.set_value(str(len(low_stock)))
+
+        self.low_stock_table.setRowCount(len(low_stock))
+        for row, item in enumerate(low_stock):
+            self.low_stock_table.setItem(row, 0, QTableWidgetItem(item["part_number"]))
+            self.low_stock_table.setItem(row, 1, QTableWidgetItem(item["name"]))
+            self.low_stock_table.setItem(row, 2, QTableWidgetItem(str(item["quantity_on_hand"])))
+            self.low_stock_table.setItem(row, 3, QTableWidgetItem(str(item["reorder_level"])))
+
 
 class DashboardWindow(QMainWindow):
     def __init__(self, current_user: User, parent=None):
@@ -58,7 +151,8 @@ class DashboardWindow(QMainWindow):
 
     def setup_screens(self):
         # 0: Home / Overview
-        self.add_nav_item("Dashboard Overview", PlaceholderScreen("Dashboard Overview"))
+        self.dashboard_screen = DashboardScreen(self.current_user)
+        self.add_nav_item("Dashboard Overview", self.dashboard_screen)
         
         # 1: Inventory
         self.add_nav_item("Inventory", InventoryScreen(self.current_user))
@@ -88,3 +182,7 @@ class DashboardWindow(QMainWindow):
 
     def display_screen(self, index):
         self.content_area.setCurrentIndex(index)
+        # Refresh the dashboard's numbers every time it's opened, so it's
+        # never showing stale figures from when the app first launched.
+        if index == 0:
+            self.dashboard_screen.refresh()
