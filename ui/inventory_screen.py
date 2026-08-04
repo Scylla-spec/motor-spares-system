@@ -13,7 +13,7 @@ from managers.inventory_manager import (
 )
 from managers.supplier_manager import get_all_suppliers
 from ui.excel_import_dialog import ExcelImportDialog
-
+from utils.validators import validate_part
 class AddEditPartDialog(QDialog):
     def __init__(self, parent=None, part=None):
         super().__init__(parent)
@@ -97,14 +97,15 @@ class AddEditPartDialog(QDialog):
                 self.supplier_combo.setCurrentIndex(idx)
 
     def save_part(self):
-        if not self.part_number.text().strip() or not self.name.text().strip():
-            QMessageBox.warning(self, "Validation", "Part Number and Name are required.")
+        is_valid, error = validate_part(
+            self.part_number.text().strip(),
+            self.name.text().strip(),
+            self.cost_price.value(),
+            self.selling_price.value(),
+        )
+        if not is_valid:
+            QMessageBox.warning(self, "Validation", error)
             return
-            
-        if self.selling_price.value() < self.cost_price.value():
-            QMessageBox.warning(self, "Validation", "Selling price must be >= cost price.")
-            return
-
         new_part = Part(
             part_id=self.part.part_id if self.part else None,
             part_number=self.part_number.text().strip(),
@@ -332,7 +333,7 @@ class InventoryScreen(QWidget):
                 QMessageBox.information(self, "Stock Adjusted", message)
             else:
                 QMessageBox.critical(self, "Adjustment Failed", message)
-                
+
     def open_excel_import(self):
         dialog = ExcelImportDialog(self)
         dialog.import_complete.connect(self.load_inventory)

@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from models.customer import Customer
 from managers.customer_manager import add_customer, update_customer, get_all_customers, get_customer_purchase_history
-
+from utils.validators import validate_required_name
 class AddEditCustomerDialog(QDialog):
     def __init__(self, parent=None, customer=None):
         super().__init__(parent)
@@ -46,8 +46,9 @@ class AddEditCustomerDialog(QDialog):
 
     def save_customer(self):
         name = self.name_input.text().strip()
-        if not name:
-            QMessageBox.warning(self, "Validation Error", "Name is required.")
+        is_valid, error = validate_required_name(name, "Customer name")
+        if not is_valid:
+            QMessageBox.warning(self, "Validation Error", error)
             return
             
         self.customer = Customer(

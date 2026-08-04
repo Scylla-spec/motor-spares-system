@@ -5,7 +5,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from managers.auth_manager import get_all_users, create_user
-
+from managers.backup_manager import backup_database
+from utils.validators import validate_new_user
 class UserManagementScreen(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -27,6 +28,12 @@ class UserManagementScreen(QWidget):
         self.user_table.setEditTriggers(QTableWidget.NoEditTriggers)
         
         left_layout.addWidget(self.user_table)
+
+        self.backup_btn = QPushButton("Back Up Database")
+        self.backup_btn.setStyleSheet("background-color: #2980b9; color: white; font-weight: bold; padding: 8px;")
+        self.backup_btn.clicked.connect(self.run_backup)
+        left_layout.addWidget(self.backup_btn)
+
         layout.addLayout(left_layout, 2)  # Give table more space
 
         # Right panel: Add User Form
@@ -62,14 +69,23 @@ class UserManagementScreen(QWidget):
             self.user_table.setItem(row, 1, QTableWidgetItem(user.username))
             self.user_table.setItem(row, 2, QTableWidgetItem(user.role))
             self.user_table.setItem(row, 3, QTableWidgetItem(user.password_hash[:15] + "..."))
-
-    def add_user(self):
+    def run_backup(self):
+        success, result = backup_database()
+        if success:
+            QMessageBox.information(
+                self, "Backup Complete",
+                f"Database backed up successfully to:\n{result}"
+            )
+        else:
+            QMessageBox.critical(self, "Backup Failed", result)
+   def add_user(self):
         username = self.username_input.text().strip()
         password = self.password_input.text()
         role = self.role_combo.currentText()
         
-        if not username or not password:
-            QMessageBox.warning(self, "Validation Error", "Username and Password are required.")
+        is_valid, error = validate_new_user(username, password)
+        if not is_valid:
+            QMessageBox.warning(self, "Validation Error", error)
             return
             
         success = create_user(username, password, role)

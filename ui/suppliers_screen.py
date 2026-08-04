@@ -9,6 +9,7 @@ from models.supplier import Supplier
 from models.purchase_order import PurchaseOrder
 from managers.supplier_manager import add_supplier, update_supplier, get_all_suppliers
 from managers.purchase_order_manager import create_po, update_po_status, get_all_pos
+from utils.validators import validate_required_name
 
 class AddEditSupplierDialog(QDialog):
     def __init__(self, parent=None, supplier=None):
@@ -47,8 +48,9 @@ class AddEditSupplierDialog(QDialog):
 
     def save_supplier(self):
         name = self.name_input.text().strip()
-        if not name:
-            QMessageBox.warning(self, "Validation Error", "Name is required.")
+        is_valid, error = validate_required_name(name, "Supplier name")
+        if not is_valid:
+            QMessageBox.warning(self, "Validation Error", error)
             return
             
         self.supplier = Supplier(
