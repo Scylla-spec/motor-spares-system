@@ -185,8 +185,6 @@ class POSScreen(QWidget):
 
     def change_cart_qty(self, part_id, new_qty):
         if part_id in self.cart_items:
-            # We would ideally re-check max stock here from DB, but for simple UI logic 
-            # we allow it and rely on checkout validation to catch race conditions.
             self.cart_items[part_id].quantity = new_qty
             self.update_cart_display()
 
@@ -194,10 +192,9 @@ class POSScreen(QWidget):
         if part_id in self.cart_items:
             del self.cart_items[part_id]
             self.update_cart_display()
+
     def cancel_sale(self):
-        """FR-16 / BR-07: discards the entire in-progress cart. Since nothing is
-        written to the database until checkout (BR-06), this has zero effect on
-        inventory or reports — it's a pure UI reset."""
+        """FR-16 / BR-07: discards the entire in-progress cart."""
         if not self.cart_items:
             return
         confirm = QMessageBox.question(
@@ -208,7 +205,7 @@ class POSScreen(QWidget):
         if confirm == QMessageBox.Yes:
             self.cart_items.clear()
             self.update_cart_display()
-            
+
     def checkout(self):
         if not self.cart_items:
             QMessageBox.warning(self, "Empty Cart", "Cannot checkout an empty cart.")

@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt
 from managers.auth_manager import get_all_users, create_user
 from managers.backup_manager import backup_database
 from utils.validators import validate_new_user
+
 class UserManagementScreen(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -69,6 +70,7 @@ class UserManagementScreen(QWidget):
             self.user_table.setItem(row, 1, QTableWidgetItem(user.username))
             self.user_table.setItem(row, 2, QTableWidgetItem(user.role))
             self.user_table.setItem(row, 3, QTableWidgetItem(user.password_hash[:15] + "..."))
+
     def run_backup(self):
         success, result = backup_database()
         if success:
@@ -78,7 +80,8 @@ class UserManagementScreen(QWidget):
             )
         else:
             QMessageBox.critical(self, "Backup Failed", result)
-   def add_user(self):
+
+    def add_user(self):
         username = self.username_input.text().strip()
         password = self.password_input.text()
         role = self.role_combo.currentText()

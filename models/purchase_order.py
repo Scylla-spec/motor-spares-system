@@ -9,6 +9,7 @@ class PurchaseOrder:
     status: str  # 'Draft', 'Ordered', 'Received'
     order_date: Optional[str]
     total_cost: float
-    
+    po_number: str = ""
+
     # Optional fields for UI display
     supplier_name: str = ""

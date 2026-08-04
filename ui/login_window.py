@@ -58,8 +58,7 @@ class LoginWindow(QDialog):
         if not username or not password:
             QMessageBox.warning(self, "Login Failed", "Please enter both username and password.")
             return
-
-       user, message = authenticate_user(username, password)
+        user, message = authenticate_user(username, password)
         if user:
             self.login_successful.emit(user)
             self.accept()

@@ -182,7 +182,5 @@ class DashboardWindow(QMainWindow):
 
     def display_screen(self, index):
         self.content_area.setCurrentIndex(index)
-        # Refresh the dashboard's numbers every time it's opened, so it's
-        # never showing stale figures from when the app first launched.
         if index == 0:
             self.dashboard_screen.refresh()

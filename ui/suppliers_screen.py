@@ -153,7 +153,7 @@ class SuppliersScreen(QWidget):
         
         self.po_table = QTableWidget()
         self.po_table.setColumnCount(6)
-        self.po_table.setHorizontalHeaderLabels(["PO ID", "Supplier", "Date", "Est. Total", "Status", "Actions"])
+        self.po_table.setHorizontalHeaderLabels(["PO Number", "Supplier", "Date", "Est. Total", "Status", "Actions"])
         self.po_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.po_table.setEditTriggers(QTableWidget.NoEditTriggers)
         bottom_layout.addWidget(self.po_table)
@@ -175,7 +175,7 @@ class SuppliersScreen(QWidget):
         pos = get_all_pos()
         self.po_table.setRowCount(len(pos))
         for row, po in enumerate(pos):
-            self.po_table.setItem(row, 0, QTableWidgetItem(str(po.po_id)))
+            self.po_table.setItem(row, 0, QTableWidgetItem(po.po_number or str(po.po_id)))
             self.po_table.setItem(row, 1, QTableWidgetItem(po.supplier_name))
             self.po_table.setItem(row, 2, QTableWidgetItem(str(po.order_date)))
             self.po_table.setItem(row, 3, QTableWidgetItem(f"${po.total_cost:.2f}"))

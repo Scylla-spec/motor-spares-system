@@ -3,7 +3,7 @@ import logging
 from typing import List, Dict, Any
 from database.db_manager import get_connection
 from models.customer import Customer
-from models.sale import Sale
+
 
 def add_customer(customer: Customer) -> bool:
     """Adds a new customer."""
@@ -25,6 +25,7 @@ def add_customer(customer: Customer) -> bool:
     finally:
         conn.close()
 
+
 def update_customer(customer: Customer) -> bool:
     """Updates an existing customer."""
     conn = get_connection()
@@ -42,6 +43,7 @@ def update_customer(customer: Customer) -> bool:
         return False
     finally:
         conn.close()
+
 
 def get_all_customers() -> List[Customer]:
     """Retrieves all customers."""
@@ -64,6 +66,7 @@ def get_all_customers() -> List[Customer]:
     finally:
         conn.close()
 
+
 def get_customer_purchase_history(customer_id: int) -> List[Dict[str, Any]]:
     """Retrieves a list of basic sale info for a specific customer."""
     conn = get_connection()
@@ -71,9 +74,9 @@ def get_customer_purchase_history(customer_id: int) -> List[Dict[str, Any]]:
     history = []
     try:
         cursor.execute("""
-            SELECT sale_id, total_amount, payment_method, timestamp 
-            FROM Sale 
-            WHERE customer_id = ? 
+            SELECT sale_id, total_amount, payment_method, timestamp
+            FROM Sale
+            WHERE customer_id = ?
             ORDER BY timestamp DESC
         """, (customer_id,))
         for row in cursor.fetchall():
