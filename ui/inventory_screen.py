@@ -252,8 +252,11 @@ class InventoryScreen(QWidget):
             self.table.setItem(row, 4, QTableWidgetItem(part.brand))
             
             stock_item = QTableWidgetItem(str(part.quantity_on_hand))
-            if part.is_low_stock():
-                stock_item.setBackground(QColor("#ffcccc")) # Light red
+            if part.quantity_on_hand == 0:
+                stock_item.setBackground(QColor("#e74c3c"))  # Solid red - out of stock
+                stock_item.setForeground(QColor("white"))
+            elif part.is_low_stock():
+                stock_item.setBackground(QColor("#ffcccc"))  # Light red - at/below reorder level
                 stock_item.setForeground(QColor("black"))
             self.table.setItem(row, 5, stock_item)
             

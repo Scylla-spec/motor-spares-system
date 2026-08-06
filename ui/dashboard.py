@@ -12,6 +12,7 @@ from ui.pos_screen import POSScreen
 from ui.customers_screen import CustomersScreen
 from ui.suppliers_screen import SuppliersScreen
 from ui.reports_screen import ReportsScreen
+from ui.settings_screen import SettingsScreen
 from managers.reports_manager import get_daily_sales_summary, get_low_stock_parts
 
 
@@ -172,7 +173,11 @@ class DashboardWindow(QMainWindow):
         # 6: User Management (Admin Only)
         if self.current_user.is_admin():
             self.add_nav_item("User Management", UserManagementScreen())
-            
+
+        # 7: Settings (Admin Only)
+        if self.current_user.is_admin():
+            self.add_nav_item("Settings", SettingsScreen())
+
         self.sidebar.setCurrentRow(0)
 
     def add_nav_item(self, label_text, widget):

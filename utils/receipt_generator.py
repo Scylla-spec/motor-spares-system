@@ -4,6 +4,7 @@ from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from models.sale import Sale
+from managers.settings_manager import get_all_settings
 
 RECEIPTS_DIR = "receipts"
 
@@ -15,18 +16,31 @@ def generate_pdf_receipt(sale: Sale, receipt_number: str, cashier_name: str, cus
     os.makedirs(RECEIPTS_DIR, exist_ok=True)
     filename = f"{receipt_number}.pdf"
     filepath = os.path.join(RECEIPTS_DIR, filename)
-    
+
+    settings = get_all_settings()
+
     try:
         c = canvas.Canvas(filepath, pagesize=letter)
         width, height = letter
-        
+
+        # Logo (if one has been set in Settings) — drawn top-left so it
+        # doesn't collide with the centred header text.
+        if settings.get("logo_path") and os.path.isfile(settings["logo_path"]):
+            try:
+                c.drawImage(
+                    settings["logo_path"], 50, height - 85,
+                    width=50, height=50, preserveAspectRatio=True, mask='auto'
+                )
+            except Exception as img_err:
+                logging.warning(f"Could not draw logo on receipt: {img_err}")
+
         # Header
         c.setFont("Helvetica-Bold", 16)
-        c.drawCentredString(width / 2.0, height - 50, "Motor Spares Management")
-        
+        c.drawCentredString(width / 2.0, height - 50, settings.get("shop_name") or "Motor Spares Management")
+
         c.setFont("Helvetica", 10)
-        c.drawCentredString(width / 2.0, height - 65, "123 Auto Lane, Bulawayo, Zimbabwe")
-        c.drawCentredString(width / 2.0, height - 80, "Tel: +263 77 123 4567")
+        c.drawCentredString(width / 2.0, height - 65, settings.get("address") or "")
+        c.drawCentredString(width / 2.0, height - 80, f"Tel: {settings.get('phone') or ''}")
         
         # Receipt details
         c.setFont("Helvetica-Bold", 12)
@@ -81,7 +95,7 @@ def generate_pdf_receipt(sale: Sale, receipt_number: str, cashier_name: str, cus
         
         # Footer
         c.setFont("Helvetica-Oblique", 10)
-        c.drawCentredString(width / 2.0, 50, "Thank you for your business!")
+        c.drawCentredString(width / 2.0, 50, settings.get("receipt_footer") or "Thank you for your business!")
         
         c.save()
         logging.info(f"Receipt {receipt_number} generated successfully at {filepath}")

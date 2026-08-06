@@ -10,6 +10,25 @@ a given field is entered.
 MIN_PASSWORD_LENGTH = 6
 
 
+def normalize_part_number(part_number: str) -> str:
+    """Normalizes a part number to uppercase, trimmed (FR-24).
+
+    Applied at save time so part_number is consistent everywhere it's used
+    for search, display, receipts, and exports \u2014 not left to whatever
+    case the user happened to type.
+    """
+    return (part_number or "").strip().upper()
+
+
+def normalize_category(category: str) -> str:
+    """Normalizes a category to uppercase, trimmed (FR-24).
+
+    Prevents case-based duplicate categories (e.g. 'Engine' vs 'engine'
+    vs 'ENGINE' all being treated as different categories).
+    """
+    return (category or "").strip().upper()
+
+
 def validate_part(part_number: str, name: str, cost_price: float, selling_price: float) -> tuple[bool, str]:
     """Validates a part before it is saved (add or edit)."""
     if not part_number or not part_number.strip():

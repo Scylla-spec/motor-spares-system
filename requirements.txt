@@ -5,3 +5,4 @@ bcrypt
 openpyxl
 thefuzz
 python-Levenshtein
+matplotlib

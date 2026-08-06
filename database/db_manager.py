@@ -149,6 +149,45 @@ def initialize_database():
         # Lookup Index for AuditLog
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_lookup ON AuditLog(table_name, record_id);")
 
+        # 10. ShopSettings Table (FR-18) — simple key/value config store
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ShopSettings (
+                setting_key TEXT PRIMARY KEY,
+                setting_value TEXT
+            );
+        """)
+
+        # 11. ReorderWishlist Table (FR-21) — manually-added reorder items
+        # for parts that are unavailable or not yet catalogued.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ReorderWishlist (
+                wishlist_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                description TEXT NOT NULL,
+                preferred_supplier_id INTEGER,
+                priority TEXT NOT NULL CHECK(priority IN ('High', 'Medium', 'Low')) DEFAULT 'Medium',
+                notes TEXT,
+                date_added TEXT NOT NULL,
+                added_by INTEGER,
+                FOREIGN KEY (preferred_supplier_id) REFERENCES Supplier(supplier_id) ON DELETE SET NULL,
+                FOREIGN KEY (added_by) REFERENCES User(user_id) ON DELETE SET NULL
+            );
+        """)
+
+        # Seed default branding values on first run only (won't overwrite
+        # values an Admin has already changed via the Settings screen).
+        default_settings = {
+            "shop_name": "Motor Spares Management",
+            "address": "123 Auto Lane, Bulawayo, Zimbabwe",
+            "phone": "+263 77 123 4567",
+            "receipt_footer": "Thank you for your business!",
+            "logo_path": "",
+        }
+        for key, value in default_settings.items():
+            cursor.execute(
+                "INSERT OR IGNORE INTO ShopSettings (setting_key, setting_value) VALUES (?, ?);",
+                (key, value)
+            )
+
         # --- Migration: add account-lockout columns to User if they don't exist yet ---
         # (Safe to re-run: checks first, so it won't error on a fresh DB that
         # already has them, or a pre-existing DB that doesn't.)

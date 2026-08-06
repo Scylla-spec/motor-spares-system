@@ -6,9 +6,13 @@ from database.db_manager import get_connection
 from models.part import Part
 from models.stock_movement import StockMovement
 from typing import List, Optional, Tuple
+from utils.validators import normalize_part_number, normalize_category
 
 def add_part(part: Part) -> bool:
     """Adds a new part to the inventory."""
+    part.part_number = normalize_part_number(part.part_number)
+    part.category = normalize_category(part.category)
+
     conn = get_connection()
     cursor = conn.cursor()
     try:
@@ -46,6 +50,9 @@ def add_part(part: Part) -> bool:
 
 def update_part(part: Part, user_id: int) -> bool:
     """Updates an existing part. Logs price changes."""
+    part.part_number = normalize_part_number(part.part_number)
+    part.category = normalize_category(part.category)
+
     conn = get_connection()
     cursor = conn.cursor()
     try:

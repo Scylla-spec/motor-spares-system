@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
-    QDateEdit, QComboBox, QSplitter, QSpinBox
+    QDateEdit, QComboBox, QSplitter, QSpinBox, QMessageBox
 )
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QColor
@@ -11,6 +11,13 @@ from managers.reports_manager import (
     get_top_selling_parts, get_low_stock_parts, get_profit_margin_report
 )
 from managers.inventory_manager import record_stock_in
+from managers.supplier_manager import get_all_suppliers
+from managers.wishlist_manager import (
+    add_wishlist_item, remove_wishlist_item, get_all_wishlist_items
+)
+from models.wishlist_item import WishlistItem, PRIORITY_LEVELS
+from utils.reorder_export import generate_reorder_pdf
+from ui.sales_trend_chart import SalesTrendChart
 
 class ReportsScreen(QWidget):
     def __init__(self, current_user, parent=None):
@@ -73,6 +80,11 @@ class ReportsScreen(QWidget):
         self.sales_table = self._make_table(["Date", "Transactions", "Revenue ($)"])
         layout.addWidget(self.sales_table)
 
+        # --- Sales Trend Graph (FR-22) ---
+        layout.addWidget(QLabel("<b>Sales Trend</b> (updates when you run a monthly report):"))
+        self.sales_chart = SalesTrendChart()
+        layout.addWidget(self.sales_chart)
+
         return w
 
     def run_daily_report(self):
@@ -104,6 +116,8 @@ class ReportsScreen(QWidget):
             self.sales_table.setItem(i, 0, QTableWidgetItem(r["date"]))
             self.sales_table.setItem(i, 1, QTableWidgetItem(str(r["transaction_count"])))
             self.sales_table.setItem(i, 2, QTableWidgetItem(f"${r['total_revenue']:.2f}"))
+
+        self.sales_chart.update_chart(rows, f"{month_name} {year}")
 
     # ------------------------------------------------------------------ Top Sellers
     def _build_top_sellers_tab(self):
@@ -155,6 +169,12 @@ class ReportsScreen(QWidget):
         refresh_btn = QPushButton("Refresh")
         refresh_btn.clicked.connect(self.load_low_stock)
         top_bar.addWidget(refresh_btn)
+
+        export_btn = QPushButton("Export Reorder List (PDF)")
+        export_btn.setStyleSheet("background-color: #2980b9; color: white; font-weight: bold; padding: 6px;")
+        export_btn.clicked.connect(self.export_reorder_list)
+        top_bar.addWidget(export_btn)
+
         top_bar.addStretch()
         layout.addLayout(top_bar)
 
@@ -163,7 +183,106 @@ class ReportsScreen(QWidget):
         )
         layout.addWidget(self.low_stock_table)
         self.load_low_stock()
+
+        # --- Reorder Wishlist section (FR-21) ---
+        # Manually-added items for parts that are unavailable or not yet
+        # catalogued, so they don't get missed on the next supplier visit.
+        layout.addWidget(QLabel("<b>Reorder Wishlist</b> \u2014 unavailable or uncatalogued items:"))
+
+        wishlist_bar = QHBoxLayout()
+        add_wishlist_btn = QPushButton("Add Wishlist Item")
+        add_wishlist_btn.clicked.connect(self.add_wishlist_item_dialog)
+        wishlist_bar.addWidget(add_wishlist_btn)
+        wishlist_bar.addStretch()
+        layout.addLayout(wishlist_bar)
+
+        self.wishlist_table = self._make_table(
+            ["Description", "Priority", "Preferred Supplier", "Notes", "Date Added", "Action"]
+        )
+        layout.addWidget(self.wishlist_table)
+        self.load_wishlist()
+
         return w
+
+    def load_wishlist(self):
+        data = get_all_wishlist_items()
+        self.wishlist_table.setRowCount(len(data))
+        priority_colors = {"High": "#f8d7da", "Medium": "#fff3cd", "Low": "#e2e3e5"}
+        for i, r in enumerate(data):
+            self.wishlist_table.setItem(i, 0, QTableWidgetItem(r["description"]))
+
+            priority_item = QTableWidgetItem(r["priority"])
+            priority_item.setBackground(QColor(priority_colors.get(r["priority"], "#ffffff")))
+            priority_item.setTextAlignment(Qt.AlignCenter)
+            self.wishlist_table.setItem(i, 1, priority_item)
+
+            self.wishlist_table.setItem(i, 2, QTableWidgetItem(r["supplier_name"] or "\u2014"))
+            self.wishlist_table.setItem(i, 3, QTableWidgetItem(r["notes"] or ""))
+            self.wishlist_table.setItem(i, 4, QTableWidgetItem(str(r["date_added"])))
+
+            remove_btn = QPushButton("Remove")
+            remove_btn.clicked.connect(lambda checked, wid=r["wishlist_id"]: self.remove_wishlist_item_confirm(wid))
+            self.wishlist_table.setCellWidget(i, 5, remove_btn)
+
+    def add_wishlist_item_dialog(self):
+        from PySide6.QtWidgets import QDialog, QFormLayout, QLineEdit, QTextEdit, QDialogButtonBox
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Add Reorder Wishlist Item")
+        form = QFormLayout(dialog)
+
+        desc_input = QLineEdit()
+        form.addRow("Description:", desc_input)
+
+        priority_input = QComboBox()
+        priority_input.addItems(PRIORITY_LEVELS)
+        priority_input.setCurrentText("Medium")
+        form.addRow("Priority:", priority_input)
+
+        supplier_input = QComboBox()
+        supplier_input.addItem("(None)", None)
+        for s in get_all_suppliers():
+            supplier_input.addItem(s.name, s.supplier_id)
+        form.addRow("Preferred Supplier:", supplier_input)
+
+        notes_input = QTextEdit()
+        notes_input.setMaximumHeight(60)
+        form.addRow("Notes:", notes_input)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+
+        if dialog.exec() == QDialog.Accepted:
+            description = desc_input.text().strip()
+            if not description:
+                QMessageBox.warning(self, "Validation Error", "Description is required.")
+                return
+            item = WishlistItem(
+                wishlist_id=None,
+                description=description,
+                preferred_supplier_id=supplier_input.currentData(),
+                priority=priority_input.currentText(),
+                notes=notes_input.toPlainText().strip(),
+                date_added=None,
+                added_by=None
+            )
+            if add_wishlist_item(item, added_by=self.current_user.user_id):
+                self.load_wishlist()
+            else:
+                QMessageBox.critical(self, "Error", "Failed to add wishlist item.")
+
+    def remove_wishlist_item_confirm(self, wishlist_id):
+        from PySide6.QtWidgets import QMessageBox as MB
+        reply = MB.question(
+            self, "Remove Wishlist Item",
+            "Remove this item from the reorder wishlist?",
+            MB.Yes | MB.No
+        )
+        if reply == MB.Yes:
+            if remove_wishlist_item(wishlist_id):
+                self.load_wishlist()
 
     def load_low_stock(self):
         data = get_low_stock_parts()
@@ -201,6 +320,18 @@ class ReportsScreen(QWidget):
         if ok and qty > 0:
             if record_stock_in(part_id, qty):
                 self.load_low_stock()
+
+    def export_reorder_list(self):
+        data = get_low_stock_parts()
+        wishlist_data = get_all_wishlist_items()
+        filepath = generate_reorder_pdf(data, wishlist_data)
+        if filepath:
+            QMessageBox.information(
+                self, "Reorder List Exported",
+                f"Reorder list saved to:\n{filepath}"
+            )
+        else:
+            QMessageBox.critical(self, "Export Failed", "Could not generate the reorder list PDF.")
 
     # ------------------------------------------------------------------ Profit Margin
     def _build_margin_tab(self):
