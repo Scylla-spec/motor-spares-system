@@ -218,23 +218,21 @@ def auto_correct_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
     return corrected_rows
 
-def import_parts_from_excel(filepath: str) -> Dict[str, Any]:
+def import_parts_from_rows(corrected: List[Dict[str, Any]], parse_warnings: List[str] = None) -> Dict[str, Any]:
     """
-    Full pipeline: parse → auto-correct → import.
-    Returns a report dict: {imported, skipped, warnings, errors}.
+    Commits already-parsed-and-corrected rows to inventory. This is the
+    shared tail end used by both Excel import and Image/OCR import (FR-19)
+    \u2014 and critically, it's what lets a user's manual corrections in the
+    review table actually get committed, instead of the import silently
+    re-reading the original source file from scratch.
     """
-    raw_rows, parse_warnings = parse_excel_file(filepath)
-    if not raw_rows:
-        return {"imported": 0, "skipped": 0, "warnings": parse_warnings, "errors": ["No data rows found."]}
-
-    corrected = auto_correct_rows(raw_rows)
     imported = 0
     skipped = 0
-    all_warnings = list(parse_warnings)
+    all_warnings = list(parse_warnings or [])
     all_errors = []
 
     for i, row in enumerate(corrected, start=1):
-        if row["_errors"]:
+        if row.get("_errors"):
             all_errors.append(f"Row {i} ({row.get('part_number','?')}): {'; '.join(row['_errors'])}")
             skipped += 1
             continue
@@ -255,7 +253,7 @@ def import_parts_from_excel(filepath: str) -> Dict[str, Any]:
         success = add_part(part)
         if success:
             imported += 1
-            for c in row["_corrections"]:
+            for c in row.get("_corrections", []):
                 all_warnings.append(f"Row {i} auto-corrected: {c}")
         else:
             all_errors.append(f"Row {i} ({row['part_number']}): Failed to insert (duplicate part number?).")
@@ -268,3 +266,16 @@ def import_parts_from_excel(filepath: str) -> Dict[str, Any]:
         "errors": all_errors,
         "rows": corrected
     }
+
+
+def import_parts_from_excel(filepath: str) -> Dict[str, Any]:
+    """
+    Full pipeline: parse → auto-correct → import.
+    Returns a report dict: {imported, skipped, warnings, errors}.
+    """
+    raw_rows, parse_warnings = parse_excel_file(filepath)
+    if not raw_rows:
+        return {"imported": 0, "skipped": 0, "warnings": parse_warnings, "errors": ["No data rows found."]}
+
+    corrected = auto_correct_rows(raw_rows)
+    return import_parts_from_rows(corrected, parse_warnings)

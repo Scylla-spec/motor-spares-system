@@ -1,19 +1,21 @@
 """
-Excel Import Dialog — Step-by-step wizard for bulk importing parts from .xlsx files.
+Shared base for bulk-import wizards. Excel import and Image/OCR import
+(FR-19) both funnel into the same review-and-correct step, the same
+edit-sync-before-commit fix, and the same import worker \u2014 only Step 1
+(how the raw rows get parsed in the first place) differs between them.
 """
+from typing import List, Tuple, Dict, Any
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFileDialog, QTableWidget, QTableWidgetItem, QHeaderView,
+    QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QProgressBar, QStackedWidget, QWidget, QTextEdit
 )
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QColor
-from utils.excel_importer import parse_excel_file, auto_correct_rows, import_parts_from_rows
+from utils.excel_importer import import_parts_from_rows
+from utils.validators import normalize_part_number, normalize_category
 
 
-# ---------------------------------------------------------------------------
-# Background Worker Thread (keeps UI responsive during import)
-# ---------------------------------------------------------------------------
 class ImportWorker(QThread):
     finished = Signal(dict)
     error = Signal(str)
@@ -30,30 +32,32 @@ class ImportWorker(QThread):
             self.error.emit(str(e))
 
 
-# ---------------------------------------------------------------------------
-# Main Dialog
-# ---------------------------------------------------------------------------
-class ExcelImportDialog(QDialog):
+class BaseImportDialog(QDialog):
+    """Not used directly \u2014 subclass and implement:
+      - self.step1_title, self.dialog_title (strings)
+      - _build_step1(self) -> QWidget
+      - browse_file(self) -> None (must set self.filepath and update the UI)
+      - _parse_and_correct(self) -> Tuple[List[dict], List[str]]
+        (raises on hard failure; returns ([], warnings) if nothing usable found)
+    """
     import_complete = Signal()  # emitted so inventory screen can refresh
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Bulk Import Parts from Excel")
         self.setMinimumSize(900, 600)
         self.filepath = None
         self._preview_data = []
+        self._preview_cols = []
         self._worker = None
-        self.setup_ui()
+        self._build_common_ui()
 
-    def setup_ui(self):
+    def _build_common_ui(self):
         layout = QVBoxLayout(self)
 
-        # Step indicator
-        self.step_label = QLabel("Step 1 of 3 — Select your Excel file")
+        self.step_label = QLabel("")
         self.step_label.setStyleSheet("font-weight: bold; font-size: 14px; padding: 6px;")
         layout.addWidget(self.step_label)
 
-        # Stacked pages
         self.pages = QStackedWidget()
         layout.addWidget(self.pages)
 
@@ -61,13 +65,12 @@ class ExcelImportDialog(QDialog):
         self.pages.addWidget(self._build_step2())
         self.pages.addWidget(self._build_step3())
 
-        # Navigation buttons
         btn_bar = QHBoxLayout()
-        self.back_btn = QPushButton("◀  Back")
+        self.back_btn = QPushButton("\u25c0  Back")
         self.back_btn.setEnabled(False)
         self.back_btn.clicked.connect(self.go_back)
 
-        self.next_btn = QPushButton("Preview  ▶")
+        self.next_btn = QPushButton("Preview  \u25b6")
         self.next_btn.clicked.connect(self.go_next)
 
         self.close_btn = QPushButton("Close")
@@ -80,46 +83,34 @@ class ExcelImportDialog(QDialog):
         btn_bar.addWidget(self.close_btn)
         layout.addLayout(btn_bar)
 
-    # ------------------------------------------------------------------ Step 1
-    def _build_step1(self):
-        w = QWidget()
-        layout = QVBoxLayout(w)
-        layout.addStretch()
+        self._update_step_label(0)
 
-        info = QLabel(
-            "<h3>📂 Select an Excel File (.xlsx)</h3>"
-            "<p>The importer recognises a wide variety of column name formats. "
-            "Required columns: <b>Part Number</b> and <b>Name</b>.</p>"
-            "<p>Optional columns: Category, Brand, Compatible Vehicles, "
-            "Cost Price, Selling Price, Quantity, Reorder Level, Supplier.</p>"
-        )
-        info.setWordWrap(True)
-        layout.addWidget(info)
+    # ---- Step 1: subclass-specific (file picker + source-specific parsing) ----
+    def _build_step1(self) -> QWidget:
+        raise NotImplementedError
 
-        self.file_label = QLabel("No file selected.")
-        self.file_label.setStyleSheet("color: grey; padding: 8px;")
-        layout.addWidget(self.file_label)
+    def browse_file(self):
+        raise NotImplementedError
 
-        browse_btn = QPushButton("📂  Browse for Excel File...")
-        browse_btn.setMinimumHeight(40)
-        browse_btn.clicked.connect(self.browse_file)
-        layout.addWidget(browse_btn)
+    def _parse_and_correct(self) -> Tuple[List[Dict[str, Any]], List[str]]:
+        raise NotImplementedError
 
-        layout.addStretch()
-        return w
-
-    # ------------------------------------------------------------------ Step 2
+    # ---- Step 2: review table (shared) ----
     def _build_step2(self):
         w = QWidget()
         layout = QVBoxLayout(w)
 
         legend = QHBoxLayout()
-        for colour, label in [("#d4edda", "OK"), ("#fff3cd", "Auto-corrected"), ("#f8d7da", "Error — will be skipped")]:
+        for colour, label in [("#d4edda", "OK"), ("#fff3cd", "Auto-corrected"), ("#f8d7da", "Error \u2014 will be skipped")]:
             swatch = QLabel(f"  {label}  ")
             swatch.setStyleSheet(f"background-color: {colour}; border: 1px solid #ccc; padding: 2px;")
             legend.addWidget(swatch)
         legend.addStretch()
         layout.addLayout(legend)
+
+        hint = QLabel("Cells below are editable \u2014 correct anything before importing.")
+        hint.setStyleSheet("color: #555; font-style: italic;")
+        layout.addWidget(hint)
 
         self.preview_table = QTableWidget()
         self.preview_table.setEditTriggers(QTableWidget.AllEditTriggers)
@@ -128,13 +119,13 @@ class ExcelImportDialog(QDialog):
 
         return w
 
-    # ------------------------------------------------------------------ Step 3
+    # ---- Step 3: result (shared) ----
     def _build_step3(self):
         w = QWidget()
         layout = QVBoxLayout(w)
 
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)  # indeterminate
+        self.progress_bar.setRange(0, 0)
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
 
@@ -144,17 +135,7 @@ class ExcelImportDialog(QDialog):
 
         return w
 
-    # ------------------------------------------------------------------ Navigation
-    def browse_file(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Select Excel File", "", "Excel Files (*.xlsx *.xls)"
-        )
-        if path:
-            self.filepath = path
-            short = path.split("\\")[-1]
-            self.file_label.setText(f"✅  {short}")
-            self.file_label.setStyleSheet("color: green; padding: 8px;")
-
+    # ---- Navigation (shared) ----
     def go_next(self):
         page = self.pages.currentIndex()
         if page == 0:
@@ -169,47 +150,47 @@ class ExcelImportDialog(QDialog):
             self.back_btn.setEnabled(page - 1 > 0)
             self.next_btn.show()
             self.close_btn.hide()
-            self._update_step_label(page)
+            self._update_step_label(page - 1)
 
     def _update_step_label(self, page):
         labels = [
-            "Step 1 of 3 — Select your Excel file",
-            "Step 2 of 3 — Review & correct data",
-            "Step 3 of 3 — Import complete"
+            self.step1_title,
+            "Step 2 of 3 \u2014 Review & correct data",
+            "Step 3 of 3 \u2014 Import complete"
         ]
         self.step_label.setText(labels[page])
 
-    # ------------------------------------------------------------------ Preview
+    # ---- Preview (shared) ----
     def _load_preview(self):
         if not self.filepath:
-            QMessageBox.warning(self, "No File", "Please select an Excel file first.")
+            QMessageBox.warning(self, "No File", "Please select a file first.")
             return
 
         try:
-            raw_rows, parse_warnings = parse_excel_file(self.filepath)
+            corrected, warnings = self._parse_and_correct()
         except Exception as e:
             QMessageBox.critical(self, "Read Error", f"Could not read file:\n{e}")
             return
 
-        if not raw_rows:
-            QMessageBox.warning(self, "Empty File", "No data rows found in the selected file.")
+        if not corrected:
+            QMessageBox.warning(self, "No Data Found", "\n".join(warnings) if warnings else "No data rows found.")
             return
 
-        self._preview_data = auto_correct_rows(raw_rows)
+        self._preview_data = corrected
         self._populate_preview_table()
 
-        if parse_warnings:
-            QMessageBox.warning(self, "Column Mapping Warnings", "\n".join(parse_warnings))
+        if warnings:
+            QMessageBox.information(self, "Notes", "\n".join(warnings))
 
         self.pages.setCurrentIndex(1)
         self.back_btn.setEnabled(True)
-        self.next_btn.setText("Import Now  ▶")
+        self.next_btn.setText("Import Now  \u25b6")
         self._update_step_label(1)
 
     def _populate_preview_table(self):
         COLS = ["part_number", "name", "category", "brand",
                 "cost_price", "selling_price", "quantity_on_hand", "reorder_level", "Notes"]
-        self._preview_cols = COLS  # stashed so edits can be read back before import
+        self._preview_cols = COLS
         self.preview_table.setColumnCount(len(COLS))
         self.preview_table.setHorizontalHeaderLabels([c.replace("_", " ").title() for c in COLS])
         self.preview_table.setRowCount(len(self._preview_data))
@@ -226,27 +207,25 @@ class ExcelImportDialog(QDialog):
                 bg = QColor("#d4edda")
 
             notes = []
-            notes += [f"✏ {c}" for c in row.get("_corrections", [])]
-            notes += [f"⚠ {w}" for w in row.get("_warnings", [])]
-            notes += [f"❌ {e}" for e in row.get("_errors", [])]
+            notes += [f"\u270f {c}" for c in row.get("_corrections", [])]
+            notes += [f"\u26a0 {w}" for w in row.get("_warnings", [])]
+            notes += [f"\u274c {e}" for e in row.get("_errors", [])]
 
             for col_idx, field in enumerate(COLS):
                 if field == "Notes":
-                    value = " | ".join(notes) if notes else "✅ OK"
+                    value = " | ".join(notes) if notes else "\u2705 OK"
                 else:
                     value = str(row.get(field, "") or "")
                 item = QTableWidgetItem(value)
                 item.setBackground(bg)
                 self.preview_table.setItem(row_idx, col_idx, item)
 
-    # ------------------------------------------------------------------ Import
+    # ---- Import (shared) ----
     def _sync_edits_from_table(self):
-        """Reads whatever is currently in the preview table's editable cells
-        back into self._preview_data before import, so corrections the user
-        typed (e.g. fixing an OCR misread) are actually used \u2014 not just
-        displayed and then discarded."""
-        from utils.validators import normalize_part_number, normalize_category
-
+        """Reads whatever is currently in the editable preview cells back
+        into self._preview_data before import, so corrections the user
+        typed (fixing an OCR misread, a bad Excel cell, etc.) actually get
+        used \u2014 not just displayed and then silently discarded."""
         for row_idx, row in enumerate(self._preview_data):
             for col_idx, field in enumerate(self._preview_cols):
                 if field == "Notes":
@@ -260,7 +239,7 @@ class ExcelImportDialog(QDialog):
                     try:
                         row[field] = float(text) if text else 0.0
                     except ValueError:
-                        pass  # keep the previously-parsed value; flagged via _errors already
+                        pass
                 elif field in ("quantity_on_hand", "reorder_level"):
                     try:
                         row[field] = int(float(text)) if text else 0
@@ -273,9 +252,6 @@ class ExcelImportDialog(QDialog):
                 else:
                     row[field] = text
 
-            # Re-check the required-field errors now that edits are applied,
-            # so a manual fix (e.g. typing in a missing part number) actually
-            # clears the row's error state instead of still being skipped.
             errors = []
             if not row.get("part_number"):
                 errors.append("Part Number is missing.")
@@ -308,18 +284,18 @@ class ExcelImportDialog(QDialog):
         errors = result.get("errors", [])
 
         summary = [
-            f"✅  Import complete!",
+            f"\u2705  Import complete!",
             f"",
             f"  Rows imported:  {imported}",
             f"  Rows skipped:   {skipped}",
             f"",
         ]
         if warnings:
-            summary.append("── Auto-corrections & Warnings ──")
+            summary.append("\u2500\u2500 Auto-corrections & Warnings \u2500\u2500")
             summary += [f"  {w}" for w in warnings]
             summary.append("")
         if errors:
-            summary.append("── Errors (rows skipped) ──")
+            summary.append("\u2500\u2500 Errors (rows skipped) \u2500\u2500")
             summary += [f"  {e}" for e in errors]
 
         self.result_text.setPlainText("\n".join(summary))
@@ -330,7 +306,7 @@ class ExcelImportDialog(QDialog):
 
     def _on_import_error(self, msg: str):
         self.progress_bar.hide()
-        self.result_text.setPlainText(f"❌ Unexpected error during import:\n\n{msg}")
+        self.result_text.setPlainText(f"\u274c Unexpected error during import:\n\n{msg}")
         self.back_btn.setEnabled(True)
         self.next_btn.show()
-        self.next_btn.setText("Retry  ▶")
+        self.next_btn.setText("Retry  \u25b6")

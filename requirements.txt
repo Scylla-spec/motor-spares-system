@@ -6,3 +6,5 @@ openpyxl
 thefuzz
 python-Levenshtein
 matplotlib
+pytesseract
+Pillow

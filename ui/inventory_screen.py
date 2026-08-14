@@ -13,6 +13,7 @@ from managers.inventory_manager import (
 )
 from managers.supplier_manager import get_all_suppliers
 from ui.excel_import_dialog import ExcelImportDialog
+from ui.image_import_dialog import ImageImportDialog
 from utils.validators import validate_part
 class AddEditPartDialog(QDialog):
     def __init__(self, parent=None, part=None):
@@ -220,6 +221,10 @@ class InventoryScreen(QWidget):
         self.import_btn = QPushButton("📥  Import from Excel")
         self.import_btn.clicked.connect(self.open_excel_import)
         top_bar.addWidget(self.import_btn)
+
+        self.image_import_btn = QPushButton("📷  Import from Photo")
+        self.image_import_btn.clicked.connect(self.open_image_import)
+        top_bar.addWidget(self.image_import_btn)
         
         layout.addLayout(top_bar)
         
@@ -339,6 +344,11 @@ class InventoryScreen(QWidget):
 
     def open_excel_import(self):
         dialog = ExcelImportDialog(self)
+        dialog.import_complete.connect(self.load_inventory)
+        dialog.exec()
+
+    def open_image_import(self):
+        dialog = ImageImportDialog(self)
         dialog.import_complete.connect(self.load_inventory)
         dialog.exec()
 
