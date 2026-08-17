@@ -30,10 +30,10 @@ class ReportsScreen(QWidget):
         layout.addWidget(QLabel("<h3>Reports & Analytics</h3>"))
 
         tabs = QTabWidget()
-        tabs.addTab(self._build_sales_tab(), "📊 Sales Summary")
-        tabs.addTab(self._build_top_sellers_tab(), "🏆 Top Sellers")
-        tabs.addTab(self._build_low_stock_tab(), "⚠ Low Stock Alert")
-        tabs.addTab(self._build_margin_tab(), "💰 Profit Margins")
+        tabs.addTab(self._build_sales_tab(), "Sales Summary")
+        tabs.addTab(self._build_top_sellers_tab(), "Top Sellers")
+        tabs.addTab(self._build_low_stock_tab(), "Low Stock Alert")
+        tabs.addTab(self._build_margin_tab(), "Profit Margins")
         layout.addWidget(tabs)
 
     # ------------------------------------------------------------------ Sales Summary

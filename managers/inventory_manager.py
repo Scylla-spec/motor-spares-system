@@ -11,7 +11,10 @@ from utils.validators import normalize_part_number, normalize_category
 def add_part(part: Part) -> bool:
     """Adds a new part to the inventory."""
     part.part_number = normalize_part_number(part.part_number)
+    part.name = (part.name or "").strip().upper()
     part.category = normalize_category(part.category)
+    part.brand = (part.brand or "").strip().upper()
+    part.compatible_vehicles = (part.compatible_vehicles or "").strip().upper()
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -51,7 +54,10 @@ def add_part(part: Part) -> bool:
 def update_part(part: Part, user_id: int) -> bool:
     """Updates an existing part. Logs price changes."""
     part.part_number = normalize_part_number(part.part_number)
+    part.name = (part.name or "").strip().upper()
     part.category = normalize_category(part.category)
+    part.brand = (part.brand or "").strip().upper()
+    part.compatible_vehicles = (part.compatible_vehicles or "").strip().upper()
 
     conn = get_connection()
     cursor = conn.cursor()

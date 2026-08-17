@@ -1,31 +1,72 @@
 """
 Image (OCR) Bulk Import Utility (FR-19)
 ========================================
-Extracts part data from a photograph of a document \u2014 a supplier price
-list, invoice, or handwritten stock sheet \u2014 using offline OCR
+Extracts part data from a photograph of a document — a supplier price
+list, invoice, or handwritten stock sheet — using offline OCR
 (pytesseract), and feeds it through the exact same auto-correction and
 review pipeline already built for Excel import (utils/excel_importer.py).
 
 Scope, deliberately: this reads photographed DOCUMENTS (text), not
 photographs of physical parts. Visual part recognition from a photo of
 the item itself is a materially different, much larger computer-vision
-feature and is out of scope here \u2014 see Section 4.1 of the v2 planning
+feature and is out of scope here — see Section 4.1 of the v2 planning
 doc for the reasoning.
 
 Requires the Tesseract OCR engine to be installed on the machine
-(a system binary, not just a pip package \u2014 see README for install
+(a system binary, not just a pip package — see README for install
 instructions per OS). Everything else runs fully offline, no cloud
 OCR service involved.
+
+If Tesseract is not installed, this module degrades gracefully:
+TESSERACT_AVAILABLE will be False and is_tesseract_available() returns
+False. All public functions return a friendly error string rather than
+crashing.
 """
 import re
 import logging
 from typing import List, Dict, Any, Tuple
 
 from PIL import Image, ImageOps
-import pytesseract
-from pytesseract import Output
 
 from utils.excel_importer import COLUMN_ALIASES, _normalise, auto_correct_rows
+
+# ---------------------------------------------------------------------------
+# Tesseract availability check — done once at import time so the UI can
+# query it before even letting the user pick a file.
+# ---------------------------------------------------------------------------
+TESSERACT_AVAILABLE: bool = False
+TESSERACT_ERROR: str = ""
+
+try:
+    import pytesseract
+    from pytesseract import Output
+    # Lightweight check: ask for version without touching any image.
+    pytesseract.get_tesseract_version()
+    TESSERACT_AVAILABLE = True
+except Exception as _tess_err:
+    TESSERACT_AVAILABLE = False
+    TESSERACT_ERROR = str(_tess_err)
+    logging.warning(f"Tesseract OCR not available: {_tess_err}")
+
+
+# Install instructions shown to the user when Tesseract is missing
+TESSERACT_INSTALL_GUIDE = (
+    "Tesseract OCR is not installed on this computer.\n\n"
+    "To enable image import, install it using ONE of these methods:\n\n"
+    "  Option 1 — Windows Package Manager (recommended):\n"
+    "    Open a terminal and run:\n"
+    "    winget install UB-Mannheim.TesseractOCR\n\n"
+    "  Option 2 — Direct installer:\n"
+    "    Download from: https://github.com/UB-Mannheim/tesseract/wiki\n"
+    "    Run the installer, then restart this application.\n\n"
+    "After installing, restart the Motor Spares System and try again."
+)
+
+
+def is_tesseract_available() -> bool:
+    """Returns True if Tesseract is installed and reachable."""
+    return TESSERACT_AVAILABLE
+
 
 # Fields we can plausibly extract from a photographed price list / invoice.
 # Same canonical set as Excel import, so auto_correct_rows() works unchanged.
@@ -34,7 +75,7 @@ _KNOWN_FIELDS = list(COLUMN_ALIASES.keys())
 
 def _preprocess_image(filepath: str) -> Image.Image:
     """Basic preprocessing to improve OCR accuracy on a phone photo:
-    grayscale + auto-contrast. Deliberately conservative \u2014 aggressive
+    grayscale + auto-contrast. Deliberately conservative — aggressive
     thresholding tends to hurt accuracy on photos taken at an angle or
     in uneven light more than it helps.
     """
@@ -51,7 +92,7 @@ def _extract_lines_by_position(img: Image.Image) -> List[List[str]]:
     plain text.
 
     This matters because image_to_string collapses any run of whitespace
-    \u2014 including a wide gap between printed table columns \u2014 down to a
+    — including a wide gap between printed table columns — down to a
     single space, so splitting on '2+ spaces' almost never finds real
     column boundaries in a photographed table. Working from word
     positions instead lets us reconstruct columns based on actual gaps
@@ -92,7 +133,7 @@ def _extract_lines_by_position(img: Image.Image) -> List[List[str]]:
             continue
 
         # A gap counts as a new column once it's noticeably wider than a
-        # typical space between words on this line \u2014 proportional to
+        # typical space between words on this line — proportional to
         # text height so it scales with the photo's resolution/zoom.
         avg_height = sum(w["height"] for w in words) / len(words)
         column_gap_threshold = max(avg_height * 1.2, 20)
@@ -137,12 +178,18 @@ def parse_image_file(filepath: str) -> Tuple[List[Dict[str, Any]], List[str]]:
     - list of warnings, including an explicit one about OCR reliability
 
     Unlike Excel import, this can't guarantee reliable column detection
-    \u2014 OCR text rarely lines up as cleanly as real spreadsheet cells.
+    — OCR text rarely lines up as cleanly as real spreadsheet cells.
     Every row is expected to be reviewed/corrected in the review dialog
     before committing, same as Excel import.
+
+    Returns ([], [error_message]) if Tesseract is not installed, so
+    callers always receive a well-formed result rather than an exception.
     """
+    if not TESSERACT_AVAILABLE:
+        return [], [TESSERACT_INSTALL_GUIDE]
+
     warnings = [
-        "OCR results are approximate \u2014 please review every row below "
+        "OCR results are approximate — please review every row below "
         "before importing, especially prices and quantities."
     ]
 
@@ -166,7 +213,7 @@ def parse_image_file(filepath: str) -> Tuple[List[Dict[str, Any]], List[str]]:
     if not has_header:
         warnings.append(
             "Could not confidently detect a header row, so columns could not "
-            "be auto-mapped. Every field below will need manual review \u2014 "
+            "be auto-mapped. Every field below will need manual review — "
             "only the raw text per line was captured."
         )
 
@@ -181,13 +228,13 @@ def parse_image_file(filepath: str) -> Tuple[List[Dict[str, Any]], List[str]]:
                 record[field] = fields[col_idx] if col_idx < len(fields) else None
         elif len(fields) >= 2:
             # No header to map against, but we still detected multiple
-            # columns from spacing \u2014 best-effort positional guess using
+            # columns from spacing — best-effort positional guess using
             # the same left-to-right order most price lists use.
             guess_order = ["part_number", "name", "category", "cost_price", "selling_price", "quantity_on_hand"]
             for idx, value in enumerate(fields[:len(guess_order)]):
                 record[guess_order[idx]] = value
         else:
-            # Only one column detected \u2014 nothing reliable to split, so
+            # Only one column detected — nothing reliable to split, so
             # the whole line goes into 'name' so nothing is silently lost;
             # the reviewer fills in the rest.
             record["name"] = fields[0]
@@ -199,10 +246,15 @@ def parse_image_file(filepath: str) -> Tuple[List[Dict[str, Any]], List[str]]:
 
 def import_image_preview(filepath: str) -> Tuple[List[Dict[str, Any]], List[str]]:
     """Parse + auto-correct, ready for the review dialog. Mirrors the
-    Excel import pipeline's parse \u2192 auto_correct_rows steps, stopping
-    short of committing anything \u2014 that happens via
+    Excel import pipeline's parse → auto_correct_rows steps, stopping
+    short of committing anything — that happens via
     utils.excel_importer.import_parts_from_rows() after the user reviews.
+
+    Returns ([], [error_message]) if Tesseract is not installed.
     """
+    if not TESSERACT_AVAILABLE:
+        return [], [TESSERACT_INSTALL_GUIDE]
+
     raw_rows, warnings = parse_image_file(filepath)
     if not raw_rows:
         return [], warnings

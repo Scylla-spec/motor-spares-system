@@ -197,23 +197,25 @@ class BaseImportDialog(QDialog):
 
         for row_idx, row in enumerate(self._preview_data):
             has_error = bool(row.get("_errors"))
-            has_correction = bool(row.get("_corrections"))
+            # A row is yellow if it has auto-corrections OR warnings (e.g. missing
+            # part number / name that the user needs to fill in).
+            has_attention = bool(row.get("_corrections")) or bool(row.get("_warnings"))
 
             if has_error:
                 bg = QColor("#f8d7da")
-            elif has_correction:
+            elif has_attention:
                 bg = QColor("#fff3cd")
             else:
                 bg = QColor("#d4edda")
 
             notes = []
-            notes += [f"\u270f {c}" for c in row.get("_corrections", [])]
-            notes += [f"\u26a0 {w}" for w in row.get("_warnings", [])]
-            notes += [f"\u274c {e}" for e in row.get("_errors", [])]
+            notes += [f"[CORRECTED] {c}" for c in row.get("_corrections", [])]
+            notes += [f"[WARNING] {w}" for w in row.get("_warnings", [])]
+            notes += [f"[ERROR] {e}" for e in row.get("_errors", [])]
 
             for col_idx, field in enumerate(COLS):
                 if field == "Notes":
-                    value = " | ".join(notes) if notes else "\u2705 OK"
+                    value = " | ".join(notes) if notes else "OK"
                 else:
                     value = str(row.get(field, "") or "")
                 item = QTableWidgetItem(value)
@@ -250,16 +252,31 @@ class BaseImportDialog(QDialog):
                 elif field == "category":
                     row[field] = normalize_category(text)
                 else:
-                    row[field] = text
+                    row[field] = text.upper()
 
+            # Re-validate after edits. Only truly unrecoverable issues
+            # (negative price) become hard errors that block import.
+            # Missing part_number or name become warnings so the user can
+            # still fill them in during review and proceed.
             errors = []
-            if not row.get("part_number"):
-                errors.append("Part Number is missing.")
-            if not row.get("name"):
-                errors.append("Name is missing.")
             if row.get("cost_price", 0) < 0:
                 errors.append("Cost price cannot be negative.")
             row["_errors"] = errors
+
+            # Refresh warnings for still-missing required-ish fields
+            existing_warns = [
+                w for w in row.get("_warnings", [])
+                if "Part Number was missing" not in w and "Name is missing" not in w
+            ]
+            if not row.get("part_number"):
+                existing_warns.append(
+                    "Part Number is blank — please fill it in before importing."
+                )
+            if not row.get("name"):
+                existing_warns.append(
+                    "Name is blank — please fill it in before importing."
+                )
+            row["_warnings"] = existing_warns
 
     def _run_import(self):
         self._sync_edits_from_table()
@@ -279,16 +296,18 @@ class BaseImportDialog(QDialog):
     def _on_import_done(self, result: dict):
         self.progress_bar.hide()
         imported = result["imported"]
+        merged = result.get("merged", 0)
         skipped = result["skipped"]
         warnings = result.get("warnings", [])
         errors = result.get("errors", [])
 
         summary = [
-            f"\u2705  Import complete!",
-            f"",
-            f"  Rows imported:  {imported}",
-            f"  Rows skipped:   {skipped}",
-            f"",
+            "Import complete!",
+            "",
+            f"  Rows added as new:        {imported}",
+            f"  Rows merged into existing: {merged}",
+            f"  Rows skipped:              {skipped}",
+            "",
         ]
         if warnings:
             summary.append("\u2500\u2500 Auto-corrections & Warnings \u2500\u2500")
@@ -306,7 +325,7 @@ class BaseImportDialog(QDialog):
 
     def _on_import_error(self, msg: str):
         self.progress_bar.hide()
-        self.result_text.setPlainText(f"\u274c Unexpected error during import:\n\n{msg}")
+        self.result_text.setPlainText(f"ERROR during import:\n\n{msg}")
         self.back_btn.setEnabled(True)
         self.next_btn.show()
         self.next_btn.setText("Retry  \u25b6")

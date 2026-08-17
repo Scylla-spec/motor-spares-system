@@ -3,6 +3,12 @@ Excel Bulk Import Utility
 =========================
 Reads .xlsx files, auto-corrects common formatting/spelling errors,
 and imports parts into the inventory.
+
+All columns are optional — any column the importer recognises is
+mapped automatically; any that are missing simply stay blank and are
+shown in the review table for the user to fill in before committing.
+Part Number is auto-generated (IMP-NNNNN) when absent so no row is
+silently lost before the user even sees it.
 """
 import re
 import logging
@@ -22,7 +28,8 @@ COLUMN_ALIASES = {
     "part_number":         ["part number", "part no", "part no.", "partno", "part_no",
                              "code", "item code", "sku", "stock code", "part#"],
     "name":                ["name", "description", "part name", "item name", "item description",
-                             "product name", "part description"],
+                             "product name", "part description",
+                             "stocks", "stock", "stock name", "item"],
     "category":            ["category", "cat", "type", "group", "product type"],
     "brand":               ["brand", "manufacturer", "make", "mfr", "mfg"],
     "compatible_vehicles": ["compatible vehicles", "vehicles", "fits", "vehicle",
@@ -31,12 +38,25 @@ COLUMN_ALIASES = {
                              "buying price", "net price"],
     "selling_price":       ["selling price", "sell price", "sale price", "retail price",
                              "price", "unit price", "rrp"],
-    "quantity_on_hand":    ["quantity", "qty", "stock", "quantity on hand", "on hand",
-                             "stock qty", "stock quantity", "units"],
+    "quantity_on_hand":    ["quantity", "qty", "quantity on hand", "on hand",
+                             "stock qty", "stock quantity", "units",
+                             "stock available", "available", "available stock", "balance"],
     "reorder_level":       ["reorder level", "reorder", "min stock", "minimum stock",
                              "reorder point", "min qty"],
     "supplier":            ["supplier", "vendor", "supplier name"],
 }
+
+# Counter used to generate unique placeholder part numbers within a single
+# import session.  Reset each time auto_correct_rows() is called.
+_placeholder_counter = 0
+
+
+def _next_placeholder() -> str:
+    """Returns the next IMP-NNNNN placeholder part number."""
+    global _placeholder_counter
+    _placeholder_counter += 1
+    return f"IMP-{_placeholder_counter:05d}"
+
 
 def _normalise(text: str) -> str:
     """Lowercase, strip whitespace for comparison."""
@@ -46,6 +66,8 @@ def _map_headers(headers: List[str]) -> Dict[str, int]:
     """
     Maps raw spreadsheet headers to canonical field names.
     Returns {canonical_field: column_index}.
+    No fields are required — any that match are used, the rest are
+    left for the user to fill in during review.
     """
     mapping = {}
     normalised_headers = [_normalise(h) for h in headers]
@@ -91,7 +113,11 @@ def parse_excel_file(filepath: str) -> Tuple[List[Dict[str, Any]], List[str]]:
     """
     Parses an Excel file and returns:
     - list of raw row dicts with canonical field names
-    - list of header-mapping warnings
+    - list of informational warnings (never hard errors here)
+
+    No columns are required. If no recognised columns are found the
+    raw cell values are still surfaced so the user can map them manually
+    in the review table.
     """
     wb = openpyxl.load_workbook(filepath, data_only=True)
     ws = wb.active
@@ -111,15 +137,40 @@ def parse_excel_file(filepath: str) -> Tuple[List[Dict[str, Any]], List[str]]:
     col_map = _map_headers(headers)
     
     warnings = []
-    required = ["part_number", "name"]
-    for req in required:
-        if req not in col_map:
-            warnings.append(f"⚠ Could not find a '{req}' column. Recognised aliases: {COLUMN_ALIASES[req][:4]}")
+    # Informational only — tell the user which columns weren't auto-detected
+    # so they know what to expect in the review table, but never block import.
+    undetected = [f for f in ("part_number", "name") if f not in col_map]
+    if undetected:
+        readable = {"part_number": "Part Number", "name": "Name"}
+        names = " and ".join(readable[f] for f in undetected)
+        warnings.append(
+            f"[INFO] {names} column(s) were not detected — auto-generated placeholders "
+            f"will be used. Please fill in the correct values in the review table."
+        )
+
+    # If NO columns were recognised at all, fall back to positional import:
+    # treat the first column as 'name' so the user at least sees the data.
+    if not col_map:
+        warnings.append(
+            "[INFO] No column headers were recognised. Treating the data as a single "
+            "column and placing everything in 'Name'. Please correct the values "
+            "in the review table before importing."
+        )
+        parsed_rows = []
+        for row in rows[header_row_idx + 1:]:
+            if all(cell is None for cell in row):
+                continue
+            # Build a record from whatever non-None cells exist left-to-right
+            non_empty = [str(c) for c in row if c is not None]
+            if non_empty:
+                record = {"name": " | ".join(non_empty)}
+                parsed_rows.append(record)
+        return parsed_rows, warnings
     
     parsed_rows = []
     for row in rows[header_row_idx + 1:]:
         if all(cell is None for cell in row):
-            continue  # skip empty rows
+            continue  # skip entirely blank rows
         
         record = {}
         for field, col_idx in col_map.items():
@@ -134,8 +185,13 @@ def auto_correct_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     Applies auto-correction to each row:
     - Cleans numeric fields
     - Fuzzy-corrects category/brand/supplier against existing DB values
+    - Auto-generates placeholder part numbers when missing
     - Adds '_warnings' and '_corrections' keys per row
+    - Only adds '_errors' for truly unrecoverable problems (negative price)
     """
+    global _placeholder_counter
+    _placeholder_counter = 0  # reset per import session
+
     # Pull existing values from DB for fuzzy matching
     parts = get_all_parts()
     existing_categories = list({p.category for p in parts if p.category})
@@ -151,36 +207,51 @@ def auto_correct_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         clean = dict(row)
 
         # --- Part Number ---
-        clean["part_number"] = str(clean.get("part_number", "")).strip().upper()
-        
+        raw_pn = str(clean.get("part_number", "") or "").strip().upper()
+        if not raw_pn:
+            # Auto-generate a placeholder so the row survives to the review
+            # table — the user can type the real number before importing.
+            placeholder = _next_placeholder()
+            clean["part_number"] = placeholder
+            warnings.append(
+                f"Part Number was missing — assigned placeholder '{placeholder}'. "
+                "Please replace it with the correct part number before importing."
+            )
+        else:
+            clean["part_number"] = raw_pn
+
         # --- Name ---
-        name = str(clean.get("name", "")).strip()
+        name = str(clean.get("name", "") or "").strip()
         if name:
-            name = name.strip().title()
+            name = name.strip().upper()
+        else:
+            warnings.append(
+                "Name is missing — please fill it in before importing."
+            )
         clean["name"] = name
 
         # --- Category: fuzzy correct ---
-        raw_cat = str(clean.get("category", "")).strip()
+        raw_cat = str(clean.get("category", "") or "").strip().upper()
         if raw_cat:
             fixed_cat, was_fixed = _fuzzy_correct(raw_cat, existing_categories)
             if was_fixed:
-                corrections.append(f"Category: '{raw_cat}' → '{fixed_cat}'")
-            clean["category"] = fixed_cat
+                corrections.append(f"Category: '{raw_cat}' → '{fixed_cat.upper()}'")
+            clean["category"] = fixed_cat.upper()
         else:
             clean["category"] = raw_cat
 
         # --- Brand: fuzzy correct ---
-        raw_brand = str(clean.get("brand", "")).strip()
+        raw_brand = str(clean.get("brand", "") or "").strip().upper()
         if raw_brand:
             fixed_brand, was_fixed = _fuzzy_correct(raw_brand, existing_brands)
             if was_fixed:
-                corrections.append(f"Brand: '{raw_brand}' → '{fixed_brand}'")
-            clean["brand"] = fixed_brand
+                corrections.append(f"Brand: '{raw_brand}' → '{fixed_brand.upper()}'")
+            clean["brand"] = fixed_brand.upper()
         else:
             clean["brand"] = raw_brand
 
         # --- Compatible Vehicles ---
-        clean["compatible_vehicles"] = str(clean.get("compatible_vehicles", "") or "").strip()
+        clean["compatible_vehicles"] = str(clean.get("compatible_vehicles", "") or "").strip().upper()
 
         # --- Numeric fields ---
         clean["cost_price"] = _clean_numeric(clean.get("cost_price", 0))
@@ -202,12 +273,8 @@ def auto_correct_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         else:
             clean["supplier_id"] = None
 
-        # --- Validation errors ---
+        # --- Errors: only truly unrecoverable issues ---
         errors = []
-        if not clean.get("part_number"):
-            errors.append("Part Number is missing.")
-        if not clean.get("name"):
-            errors.append("Name is missing.")
         if clean.get("cost_price", 0) < 0:
             errors.append("Cost price cannot be negative.")
 
@@ -218,15 +285,49 @@ def auto_correct_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
     return corrected_rows
 
+def _find_existing_part(part_number: str, name: str):
+    """
+    Looks for an existing active part that matches by part_number first,
+    then by name (case-insensitive). Returns the Part object or None.
+    Used by import_parts_from_rows to detect duplicates before inserting.
+    """
+    from managers.inventory_manager import search_parts
+    pn = (part_number or "").strip().upper()
+    nm = (name or "").strip().lower()
+
+    if pn:
+        results = search_parts(pn)
+        for p in results:
+            if p.part_number.upper() == pn:
+                return p
+
+    if nm:
+        results = search_parts(nm)
+        for p in results:
+            if p.name.strip().lower() == nm:
+                return p
+
+    return None
+
+
 def import_parts_from_rows(corrected: List[Dict[str, Any]], parse_warnings: List[str] = None) -> Dict[str, Any]:
     """
     Commits already-parsed-and-corrected rows to inventory. This is the
     shared tail end used by both Excel import and Image/OCR import (FR-19)
-    \u2014 and critically, it's what lets a user's manual corrections in the
+    — and critically, it's what lets a user's manual corrections in the
     review table actually get committed, instead of the import silently
     re-reading the original source file from scratch.
+
+    Duplicate handling:
+    - If an imported row matches an existing part (by part_number or name),
+      the quantity from the import is added to the existing part's stock
+      rather than inserting a duplicate. All other fields are left unchanged.
+    - A row with no part_number AND no name is skipped entirely.
     """
+    from managers.inventory_manager import record_stock_in
+
     imported = 0
+    merged = 0
     skipped = 0
     all_warnings = list(parse_warnings or [])
     all_errors = []
@@ -237,17 +338,50 @@ def import_parts_from_rows(corrected: List[Dict[str, Any]], parse_warnings: List
             skipped += 1
             continue
 
+        # A row is only skipped if both part_number AND name are still blank
+        # after the user's review (i.e. they didn't fill anything in).
+        if not row.get("part_number") and not row.get("name"):
+            all_errors.append(f"Row {i}: Both Part Number and Name are empty — skipped.")
+            skipped += 1
+            continue
+
+        # If only name is still blank, use a fallback so import doesn't silently fail
+        if not row.get("name"):
+            row["name"] = str(row.get("part_number", "UNKNOWN PART")).upper()
+        else:
+            row["name"] = str(row["name"]).upper()
+
+        # --- Duplicate detection ---
+        existing = _find_existing_part(row.get("part_number", ""), row.get("name", ""))
+        if existing:
+            # Part already exists — add imported quantity to its stock instead
+            qty = row.get("quantity_on_hand", 0)
+            if qty and qty > 0:
+                record_stock_in(existing.part_id, qty, reason="Imported stock addition")
+                all_warnings.append(
+                    f"Row {i} ({existing.part_number} — {existing.name}): "
+                    f"Already exists. Added {qty} unit(s) to existing stock."
+                )
+            else:
+                all_warnings.append(
+                    f"Row {i} ({existing.part_number} — {existing.name}): "
+                    f"Already exists and no quantity to add — skipped."
+                )
+            merged += 1
+            continue
+
+        # --- New part — insert ---
         part = Part(
             part_id=None,
-            part_number=row["part_number"],
-            name=row["name"],
-            category=row.get("category", ""),
-            brand=row.get("brand", ""),
-            compatible_vehicles=row.get("compatible_vehicles", ""),
-            quantity_on_hand=row["quantity_on_hand"],
-            cost_price=row["cost_price"],
-            selling_price=row["selling_price"],
-            reorder_level=row["reorder_level"],
+            part_number=str(row.get("part_number", "")).strip().upper(),
+            name=str(row["name"]).strip().upper(),
+            category=str(row.get("category", "") or "").strip().upper(),
+            brand=str(row.get("brand", "") or "").strip().upper(),
+            compatible_vehicles=str(row.get("compatible_vehicles", "") or "").strip().upper(),
+            quantity_on_hand=row.get("quantity_on_hand", 0),
+            cost_price=row.get("cost_price", 0.0),
+            selling_price=row.get("selling_price", 0.0),
+            reorder_level=row.get("reorder_level", 5),
             supplier_id=row.get("supplier_id")
         )
         success = add_part(part)
@@ -256,11 +390,12 @@ def import_parts_from_rows(corrected: List[Dict[str, Any]], parse_warnings: List
             for c in row.get("_corrections", []):
                 all_warnings.append(f"Row {i} auto-corrected: {c}")
         else:
-            all_errors.append(f"Row {i} ({row['part_number']}): Failed to insert (duplicate part number?).")
+            all_errors.append(f"Row {i} ({row.get('part_number','?')}): Failed to insert (duplicate part number?).")
             skipped += 1
 
     return {
         "imported": imported,
+        "merged": merged,
         "skipped": skipped,
         "warnings": all_warnings,
         "errors": all_errors,

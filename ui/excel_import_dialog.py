@@ -87,11 +87,15 @@ class ExcelImportDialog(QDialog):
         layout.addStretch()
 
         info = QLabel(
-            "<h3>📂 Select an Excel File (.xlsx)</h3>"
-            "<p>The importer recognises a wide variety of column name formats. "
-            "Required columns: <b>Part Number</b> and <b>Name</b>.</p>"
-            "<p>Optional columns: Category, Brand, Compatible Vehicles, "
-            "Cost Price, Selling Price, Quantity, Reorder Level, Supplier.</p>"
+            "<h3>Select an Excel File (.xlsx)</h3>"
+            "<p>The importer recognises a wide variety of column name formats — "
+            "<b>no specific column layout is required.</b> Receipts and supplier "
+            "sheets all work, even if they don't have a 'Part Number' or 'Name' column.</p>"
+            "<p>Any columns the importer can't detect automatically will be left blank "
+            "in the review table below — you can fill them in before importing.</p>"
+            "<p>Supported columns (any naming variant): Part Number, Name, Category, "
+            "Brand, Compatible Vehicles, Cost Price, Selling Price, Quantity, "
+            "Reorder Level, Supplier.</p>"
         )
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -100,7 +104,7 @@ class ExcelImportDialog(QDialog):
         self.file_label.setStyleSheet("color: grey; padding: 8px;")
         layout.addWidget(self.file_label)
 
-        browse_btn = QPushButton("📂  Browse for Excel File...")
+        browse_btn = QPushButton("Browse for Excel File...")
         browse_btn.setMinimumHeight(40)
         browse_btn.clicked.connect(self.browse_file)
         layout.addWidget(browse_btn)
@@ -152,7 +156,7 @@ class ExcelImportDialog(QDialog):
         if path:
             self.filepath = path
             short = path.split("\\")[-1]
-            self.file_label.setText(f"✅  {short}")
+            self.file_label.setText(f"[OK]  {short}")
             self.file_label.setStyleSheet("color: green; padding: 8px;")
 
     def go_next(self):
@@ -203,7 +207,7 @@ class ExcelImportDialog(QDialog):
 
         self.pages.setCurrentIndex(1)
         self.back_btn.setEnabled(True)
-        self.next_btn.setText("Import Now  ▶")
+        self.next_btn.setText("Import Now")
         self._update_step_label(1)
 
     def _populate_preview_table(self):
@@ -226,13 +230,13 @@ class ExcelImportDialog(QDialog):
                 bg = QColor("#d4edda")
 
             notes = []
-            notes += [f"✏ {c}" for c in row.get("_corrections", [])]
-            notes += [f"⚠ {w}" for w in row.get("_warnings", [])]
-            notes += [f"❌ {e}" for e in row.get("_errors", [])]
+            notes += [f"[CORRECTED] {c}" for c in row.get("_corrections", [])]
+            notes += [f"[WARNING] {w}" for w in row.get("_warnings", [])]
+            notes += [f"[ERROR] {e}" for e in row.get("_errors", [])]
 
             for col_idx, field in enumerate(COLS):
                 if field == "Notes":
-                    value = " | ".join(notes) if notes else "✅ OK"
+                    value = " | ".join(notes) if notes else "OK"
                 else:
                     value = str(row.get(field, "") or "")
                 item = QTableWidgetItem(value)
@@ -243,7 +247,7 @@ class ExcelImportDialog(QDialog):
     def _sync_edits_from_table(self):
         """Reads whatever is currently in the preview table's editable cells
         back into self._preview_data before import, so corrections the user
-        typed (e.g. fixing an OCR misread) are actually used \u2014 not just
+        typed (e.g. fixing an OCR misread) are actually used — not just
         displayed and then discarded."""
         from utils.validators import normalize_part_number, normalize_category
 
@@ -271,19 +275,31 @@ class ExcelImportDialog(QDialog):
                 elif field == "category":
                     row[field] = normalize_category(text)
                 else:
-                    row[field] = text
+                    row[field] = text.upper()
 
-            # Re-check the required-field errors now that edits are applied,
-            # so a manual fix (e.g. typing in a missing part number) actually
-            # clears the row's error state instead of still being skipped.
+            # Re-validate after edits. Only truly unrecoverable issues
+            # (negative price) remain as hard errors that block import.
+            # Missing part_number / name become warnings so the user can
+            # still fill them in and proceed.
             errors = []
-            if not row.get("part_number"):
-                errors.append("Part Number is missing.")
-            if not row.get("name"):
-                errors.append("Name is missing.")
             if row.get("cost_price", 0) < 0:
                 errors.append("Cost price cannot be negative.")
             row["_errors"] = errors
+
+            # Refresh warnings for still-missing fields
+            existing_warns = [
+                w for w in row.get("_warnings", [])
+                if "Part Number was missing" not in w and "Name is missing" not in w
+            ]
+            if not row.get("part_number"):
+                existing_warns.append(
+                    "Part Number is blank — please fill it in before importing."
+                )
+            if not row.get("name"):
+                existing_warns.append(
+                    "Name is blank — please fill it in before importing."
+                )
+            row["_warnings"] = existing_warns
 
     def _run_import(self):
         self._sync_edits_from_table()
@@ -303,16 +319,18 @@ class ExcelImportDialog(QDialog):
     def _on_import_done(self, result: dict):
         self.progress_bar.hide()
         imported = result["imported"]
+        merged = result.get("merged", 0)
         skipped = result["skipped"]
         warnings = result.get("warnings", [])
         errors = result.get("errors", [])
 
         summary = [
-            f"✅  Import complete!",
-            f"",
-            f"  Rows imported:  {imported}",
-            f"  Rows skipped:   {skipped}",
-            f"",
+            "Import complete!",
+            "",
+            f"  Rows added as new:        {imported}",
+            f"  Rows merged into existing: {merged}",
+            f"  Rows skipped:              {skipped}",
+            "",
         ]
         if warnings:
             summary.append("── Auto-corrections & Warnings ──")
@@ -330,7 +348,7 @@ class ExcelImportDialog(QDialog):
 
     def _on_import_error(self, msg: str):
         self.progress_bar.hide()
-        self.result_text.setPlainText(f"❌ Unexpected error during import:\n\n{msg}")
+        self.result_text.setPlainText(f"ERROR during import:\n\n{msg}")
         self.back_btn.setEnabled(True)
         self.next_btn.show()
-        self.next_btn.setText("Retry  ▶")
+        self.next_btn.setText("Retry")

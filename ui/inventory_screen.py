@@ -109,11 +109,11 @@ class AddEditPartDialog(QDialog):
             return
         new_part = Part(
             part_id=self.part.part_id if self.part else None,
-            part_number=self.part_number.text().strip(),
-            name=self.name.text().strip(),
-            category=self.category.text().strip(),
-            brand=self.brand.text().strip(),
-            compatible_vehicles=self.compatible_vehicles.text().strip(),
+            part_number=self.part_number.text().strip().upper(),
+            name=self.name.text().strip().upper(),
+            category=self.category.text().strip().upper(),
+            brand=self.brand.text().strip().upper(),
+            compatible_vehicles=self.compatible_vehicles.text().strip().upper(),
             quantity_on_hand=self.quantity_on_hand.value(),
             cost_price=self.cost_price.value(),
             selling_price=self.selling_price.value(),
@@ -218,24 +218,25 @@ class InventoryScreen(QWidget):
         self.add_btn.clicked.connect(self.open_add_dialog)
         top_bar.addWidget(self.add_btn)
         
-        self.import_btn = QPushButton("📥  Import from Excel")
+        self.import_btn = QPushButton("Import from Excel")
         self.import_btn.clicked.connect(self.open_excel_import)
         top_bar.addWidget(self.import_btn)
 
-        self.image_import_btn = QPushButton("📷  Import from Photo")
+        self.image_import_btn = QPushButton("Import from Photo")
         self.image_import_btn.clicked.connect(self.open_image_import)
         top_bar.addWidget(self.image_import_btn)
         
         layout.addLayout(top_bar)
         
-        # Data Table
+        # Data Table — no ID column; the built-in Qt row numbers serve as the row counter
         self.table = QTableWidget()
-        self.table.setColumnCount(8)
+        self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels([
-            "ID", "Part Number", "Name", "Category", 
+            "Part Number", "Name", "Category",
             "Brand", "Stock", "Price", "Actions"
         ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.verticalHeader().setVisible(True)  # row numbers (1, 2, 3…)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         
@@ -250,12 +251,12 @@ class InventoryScreen(QWidget):
             
         self.table.setRowCount(len(active_parts))
         for row, part in enumerate(active_parts):
-            self.table.setItem(row, 0, QTableWidgetItem(str(part.part_id)))
-            self.table.setItem(row, 1, QTableWidgetItem(part.part_number))
-            self.table.setItem(row, 2, QTableWidgetItem(part.name))
-            self.table.setItem(row, 3, QTableWidgetItem(part.category))
-            self.table.setItem(row, 4, QTableWidgetItem(part.brand))
-            
+            # Columns: Part Number | Name | Category | Brand | Stock | Price | Actions
+            self.table.setItem(row, 0, QTableWidgetItem(part.part_number))
+            self.table.setItem(row, 1, QTableWidgetItem(part.name))
+            self.table.setItem(row, 2, QTableWidgetItem(part.category))
+            self.table.setItem(row, 3, QTableWidgetItem(part.brand))
+
             stock_item = QTableWidgetItem(str(part.quantity_on_hand))
             if part.quantity_on_hand == 0:
                 stock_item.setBackground(QColor("#e74c3c"))  # Solid red - out of stock
@@ -263,18 +264,18 @@ class InventoryScreen(QWidget):
             elif part.is_low_stock():
                 stock_item.setBackground(QColor("#ffcccc"))  # Light red - at/below reorder level
                 stock_item.setForeground(QColor("black"))
-            self.table.setItem(row, 5, stock_item)
-            
-            self.table.setItem(row, 6, QTableWidgetItem(f"${part.selling_price:.2f}"))
-            
-            # Action Buttons Layout
+            self.table.setItem(row, 4, stock_item)
+
+            self.table.setItem(row, 5, QTableWidgetItem(f"${part.selling_price:.2f}"))
+
+            # Action Buttons
             action_widget = QWidget()
             action_layout = QHBoxLayout(action_widget)
-            action_layout.setContentsMargins(0,0,0,0)
-            
+            action_layout.setContentsMargins(0, 0, 0, 0)
+
             edit_btn = QPushButton("Edit")
             edit_btn.clicked.connect(lambda checked, p=part: self.open_edit_dialog(p))
-            
+
             stock_in_btn = QPushButton("Stock In")
             stock_in_btn.clicked.connect(lambda checked, p=part: self.open_stock_in_dialog(p))
 
@@ -284,14 +285,14 @@ class InventoryScreen(QWidget):
             action_layout.addWidget(edit_btn)
             action_layout.addWidget(stock_in_btn)
             action_layout.addWidget(adjust_btn)
-            
+
             if self.current_user.is_admin():
                 del_btn = QPushButton("Deactivate")
                 del_btn.setStyleSheet("color: red;")
                 del_btn.clicked.connect(lambda checked, p=part: self.deactivate(p))
                 action_layout.addWidget(del_btn)
-            
-            self.table.setCellWidget(row, 7, action_widget)
+
+            self.table.setCellWidget(row, 6, action_widget)
 
     def perform_search(self, text):
         if not text.strip():
