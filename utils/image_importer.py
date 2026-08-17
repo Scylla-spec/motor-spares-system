@@ -30,9 +30,11 @@ from PIL import Image, ImageOps
 
 from utils.excel_importer import COLUMN_ALIASES, _normalise, auto_correct_rows
 
+import os
+import shutil
+
 # ---------------------------------------------------------------------------
-# Tesseract availability check — done once at import time so the UI can
-# query it before even letting the user pick a file.
+# Tesseract availability check — auto-detect standard install locations on Windows
 # ---------------------------------------------------------------------------
 TESSERACT_AVAILABLE: bool = False
 TESSERACT_ERROR: str = ""
@@ -40,6 +42,19 @@ TESSERACT_ERROR: str = ""
 try:
     import pytesseract
     from pytesseract import Output
+
+    # Check standard Windows paths if not already in system PATH
+    _candidate_paths = [
+        os.environ.get("TESSERACT_PATH", ""),
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        os.path.expanduser(r"~\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"),
+    ]
+    for _path in _candidate_paths:
+        if _path and os.path.exists(_path):
+            pytesseract.pytesseract.tesseract_cmd = _path
+            break
+
     # Lightweight check: ask for version without touching any image.
     pytesseract.get_tesseract_version()
     TESSERACT_AVAILABLE = True
