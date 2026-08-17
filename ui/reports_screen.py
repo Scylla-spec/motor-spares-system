@@ -8,6 +8,7 @@ from PySide6.QtGui import QColor
 from datetime import date
 from managers.reports_manager import (
     get_daily_sales_summary, get_monthly_sales_summary,
+    get_daily_transactions, get_monthly_transactions,
     get_top_selling_parts, get_low_stock_parts, get_profit_margin_report
 )
 from managers.inventory_manager import record_stock_in
@@ -37,23 +38,27 @@ class ReportsScreen(QWidget):
         layout.addWidget(tabs)
 
     # ------------------------------------------------------------------ Sales Summary
+    # ------------------------------------------------------------------ Sales Summary
     def _build_sales_tab(self):
         w = QWidget()
         layout = QVBoxLayout(w)
 
+        # Controls bar
         controls = QHBoxLayout()
 
-        # Date picker for daily
-        controls.addWidget(QLabel("Daily report for:"))
+        # Date picker for daily report
+        controls.addWidget(QLabel("<b>Select Day:</b>"))
         self.daily_date = QDateEdit(QDate.currentDate())
         self.daily_date.setCalendarPopup(True)
+        self.daily_date.setDisplayFormat("yyyy-MM-dd")
+        self.daily_date.dateChanged.connect(self.run_daily_report)
         controls.addWidget(self.daily_date)
 
-        run_daily_btn = QPushButton("Run Daily")
+        run_daily_btn = QPushButton("View Daily Report")
         run_daily_btn.clicked.connect(self.run_daily_report)
         controls.addWidget(run_daily_btn)
 
-        controls.addWidget(QLabel("  |  Monthly report:"))
+        controls.addWidget(QLabel("   |   <b>Select Month:</b>"))
         self.month_combo = QComboBox()
         for i, m in enumerate(["January","February","March","April","May","June",
                                 "July","August","September","October","November","December"], 1):
@@ -66,58 +71,199 @@ class ReportsScreen(QWidget):
         controls.addWidget(self.month_combo)
         controls.addWidget(self.year_spin)
 
-        run_monthly_btn = QPushButton("Run Monthly")
+        run_monthly_btn = QPushButton("View Monthly Report")
         run_monthly_btn.clicked.connect(self.run_monthly_report)
         controls.addWidget(run_monthly_btn)
         controls.addStretch()
 
         layout.addLayout(controls)
 
-        self.summary_label = QLabel("")
-        self.summary_label.setStyleSheet("font-size: 14px; padding: 6px;")
-        layout.addWidget(self.summary_label)
+        # KPI Summary Card
+        self.summary_card = QWidget()
+        self.summary_card.setStyleSheet("""
+            QWidget {
+                background-color: #2c3e50;
+                color: white;
+                border-radius: 6px;
+                padding: 10px;
+            }
+            QLabel {
+                color: white;
+            }
+        """)
+        card_layout = QVBoxLayout(self.summary_card)
+        self.summary_title = QLabel("<b>Sales Summary</b>")
+        self.summary_title.setStyleSheet("font-size: 15px; font-weight: bold;")
+        card_layout.addWidget(self.summary_title)
 
-        self.sales_table = self._make_table(["Date", "Transactions", "Revenue ($)"])
-        layout.addWidget(self.sales_table)
+        self.summary_stats = QLabel("Select a date or month above to view transactions.")
+        self.summary_stats.setStyleSheet("font-size: 13px;")
+        card_layout.addWidget(self.summary_stats)
 
-        # --- Sales Trend Graph (FR-22) ---
-        layout.addWidget(QLabel("<b>Sales Trend</b> (updates when you run a monthly report):"))
+        self.payment_breakdown_label = QLabel("")
+        self.payment_breakdown_label.setStyleSheet("font-size: 12px; color: #ecf0f1; padding-top: 4px;")
+        card_layout.addWidget(self.payment_breakdown_label)
+
+        layout.addWidget(self.summary_card)
+
+        # Tabbed view for results: Daily Transactions vs Monthly Overview vs Trend
+        self.sales_subtabs = QTabWidget()
+
+        # Tab 1: Detailed Transactions List
+        self.tx_tab_widget = QWidget()
+        tx_layout = QVBoxLayout(self.tx_tab_widget)
+        self.tx_table_header = QLabel("<b>Transactions List:</b>")
+        tx_layout.addWidget(self.tx_table_header)
+
+        self.tx_table = self._make_table([
+            "Receipt #", "Date", "Time", "Customer", "Cashier",
+            "Items Purchased", "Payment", "Total Amount ($)"
+        ])
+        tx_layout.addWidget(self.tx_table)
+        self.sales_subtabs.addTab(self.tx_tab_widget, "Transaction Details")
+
+        # Tab 2: Monthly Day-by-Day Breakdown
+        self.monthly_breakdown_widget = QWidget()
+        m_layout = QVBoxLayout(self.monthly_breakdown_widget)
+        hint = QLabel("<i>Tip: Double-click any day below to view its individual transactions.</i>")
+        hint.setStyleSheet("color: #7f8c8d; font-size: 11px;")
+        m_layout.addWidget(hint)
+
+        self.daily_breakdown_table = self._make_table([
+            "Date", "Transactions", "Cash ($)", "EcoCash ($)", "Card ($)", "Total Revenue ($)"
+        ])
+        self.daily_breakdown_table.cellDoubleClicked.connect(self._on_monthly_day_clicked)
+        m_layout.addWidget(self.daily_breakdown_table)
+        self.sales_subtabs.addTab(self.monthly_breakdown_widget, "Monthly Day-by-Day Breakdown")
+
+        # Tab 3: Sales Trend Graph (FR-22)
+        self.chart_tab_widget = QWidget()
+        chart_layout = QVBoxLayout(self.chart_tab_widget)
+        chart_layout.addWidget(QLabel("<b>Revenue Trend (Daily):</b>"))
         self.sales_chart = SalesTrendChart()
-        layout.addWidget(self.sales_chart)
+        chart_layout.addWidget(self.sales_chart)
+        self.sales_subtabs.addTab(self.chart_tab_widget, "Sales Trend Graph")
+
+        layout.addWidget(self.sales_subtabs)
+
+        # Run initial report for today
+        self.run_daily_report()
 
         return w
 
     def run_daily_report(self):
         d = self.daily_date.date().toString("yyyy-MM-dd")
         result = get_daily_sales_summary(d)
-        self.summary_label.setText(
-            f"<b>{d}</b>  |  Transactions: {result['transaction_count']}  |  "
-            f"Total Revenue: <b>${result['total_revenue']:.2f}</b>"
+
+        total_rev = result["total_revenue"]
+        tx_count = result["transaction_count"]
+        cash_rev = result["cash_revenue"]
+        eco_rev = result["ecocash_revenue"]
+        card_rev = result["card_revenue"]
+        txs = result.get("transactions", [])
+
+        self.summary_title.setText(f"Daily Sales Report: <b>{d}</b>")
+        self.summary_stats.setText(
+            f"Total Cash/Revenue Earned: <b style='font-size:16px; color:#2ecc71;'>${total_rev:.2f}</b>   |   "
+            f"Total Transactions: <b>{tx_count}</b>   |   "
+            f"Total Items Sold: <b>{result.get('total_items', 0)}</b>"
         )
-        self.sales_table.setRowCount(1)
-        self.sales_table.setItem(0, 0, QTableWidgetItem(d))
-        self.sales_table.setItem(0, 1, QTableWidgetItem(str(result["transaction_count"])))
-        self.sales_table.setItem(0, 2, QTableWidgetItem(f"${result['total_revenue']:.2f}"))
+        self.payment_breakdown_label.setText(
+            f"Payment Breakdown:  Cash: <b>${cash_rev:.2f}</b>   |   "
+            f"EcoCash: <b>${eco_rev:.2f}</b>   |   "
+            f"Card: <b>${card_rev:.2f}</b>"
+        )
+
+        self.tx_table_header.setText(f"<b>Every Transaction on {d} ({len(txs)} total):</b>")
+        self._populate_transactions_table(txs, show_date=False)
+
+        # Clear monthly breakdown table when running a single day
+        self.daily_breakdown_table.setRowCount(0)
+
+        # Switch to transaction details tab
+        self.sales_subtabs.setCurrentIndex(0)
 
     def run_monthly_report(self):
         year = self.year_spin.value()
         month = self.month_combo.currentData()
-        rows = get_monthly_sales_summary(year, month)
-
-        total_rev = sum(r["total_revenue"] for r in rows)
-        total_tx = sum(r["transaction_count"] for r in rows)
         month_name = self.month_combo.currentText()
-        self.summary_label.setText(
-            f"<b>{month_name} {year}</b>  |  Transactions: {total_tx}  |  "
-            f"Total Revenue: <b>${total_rev:.2f}</b>"
-        )
-        self.sales_table.setRowCount(len(rows))
-        for i, r in enumerate(rows):
-            self.sales_table.setItem(i, 0, QTableWidgetItem(r["date"]))
-            self.sales_table.setItem(i, 1, QTableWidgetItem(str(r["transaction_count"])))
-            self.sales_table.setItem(i, 2, QTableWidgetItem(f"${r['total_revenue']:.2f}"))
 
-        self.sales_chart.update_chart(rows, f"{month_name} {year}")
+        day_rows = get_monthly_sales_summary(year, month)
+        all_txs = get_monthly_transactions(year, month)
+
+        total_rev = sum(r["total_revenue"] for r in day_rows)
+        total_tx = sum(r["transaction_count"] for r in day_rows)
+        cash_rev = sum(r.get("cash_revenue", 0) for r in day_rows)
+        eco_rev = sum(r.get("ecocash_revenue", 0) for r in day_rows)
+        card_rev = sum(r.get("card_revenue", 0) for r in day_rows)
+
+        self.summary_title.setText(f"Monthly Sales Report: <b>{month_name} {year}</b>")
+        self.summary_stats.setText(
+            f"Total Cash/Revenue Earned: <b style='font-size:16px; color:#2ecc71;'>${total_rev:.2f}</b>   |   "
+            f"Total Transactions: <b>{total_tx}</b>   |   "
+            f"Days with Sales: <b>{len(day_rows)}</b>"
+        )
+        self.payment_breakdown_label.setText(
+            f"Payment Breakdown:  Cash: <b>${cash_rev:.2f}</b>   |   "
+            f"EcoCash: <b>${eco_rev:.2f}</b>   |   "
+            f"Card: <b>${card_rev:.2f}</b>"
+        )
+
+        # 1. Populate all individual transactions in the month
+        self.tx_table_header.setText(f"<b>Every Transaction in {month_name} {year} ({len(all_txs)} total):</b>")
+        self._populate_transactions_table(all_txs, show_date=True)
+
+        # 2. Populate day-by-day summary
+        self.daily_breakdown_table.setRowCount(len(day_rows))
+        for i, r in enumerate(day_rows):
+            self.daily_breakdown_table.setItem(i, 0, QTableWidgetItem(r["date"]))
+            self.daily_breakdown_table.setItem(i, 1, QTableWidgetItem(str(r["transaction_count"])))
+            self.daily_breakdown_table.setItem(i, 2, QTableWidgetItem(f"${r.get('cash_revenue', 0):.2f}"))
+            self.daily_breakdown_table.setItem(i, 3, QTableWidgetItem(f"${r.get('ecocash_revenue', 0):.2f}"))
+            self.daily_breakdown_table.setItem(i, 4, QTableWidgetItem(f"${r.get('card_revenue', 0):.2f}"))
+            self.daily_breakdown_table.setItem(i, 5, QTableWidgetItem(f"${r['total_revenue']:.2f}"))
+
+        # 3. Update Chart
+        self.sales_chart.update_chart(day_rows, f"{month_name} {year}")
+
+        # Switch to day-by-day or transactions
+        self.sales_subtabs.setCurrentIndex(0)
+
+    def _populate_transactions_table(self, transactions, show_date=True):
+        """Helper to display detailed transactions in the table."""
+        self.tx_table.setRowCount(len(transactions))
+        for row, tx in enumerate(transactions):
+            date_display = tx.get("date", tx.get("timestamp", "")[:10]) if show_date else "-"
+            self.tx_table.setItem(row, 0, QTableWidgetItem(tx["receipt_no"]))
+            self.tx_table.setItem(row, 1, QTableWidgetItem(date_display))
+            self.tx_table.setItem(row, 2, QTableWidgetItem(tx["time"]))
+            self.tx_table.setItem(row, 3, QTableWidgetItem(tx["customer_name"]))
+            self.tx_table.setItem(row, 4, QTableWidgetItem(tx["cashier_name"]))
+            self.tx_table.setItem(row, 5, QTableWidgetItem(tx["items_summary"]))
+
+            # Payment method styling
+            pay_item = QTableWidgetItem(tx["payment_method"])
+            if tx["payment_method"] == "Cash":
+                pay_item.setForeground(QColor("#27ae60"))
+            elif tx["payment_method"] == "EcoCash":
+                pay_item.setForeground(QColor("#2980b9"))
+            elif tx["payment_method"] == "Card":
+                pay_item.setForeground(QColor("#8e44ad"))
+            self.tx_table.setItem(row, 6, pay_item)
+
+            amount_item = QTableWidgetItem(f"${tx['total_amount']:.2f}")
+            amount_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.tx_table.setItem(row, 7, amount_item)
+
+    def _on_monthly_day_clicked(self, row, col):
+        """When a user double-clicks a day in the monthly table, drill down into that day."""
+        date_item = self.daily_breakdown_table.item(row, 0)
+        if date_item:
+            day_str = date_item.text().strip()
+            qdate = QDate.fromString(day_str, "yyyy-MM-dd")
+            if qdate.isValid():
+                self.daily_date.setDate(qdate)
+                self.run_daily_report()
 
     # ------------------------------------------------------------------ Top Sellers
     def _build_top_sellers_tab(self):
