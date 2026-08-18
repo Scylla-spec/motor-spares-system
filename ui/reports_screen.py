@@ -458,10 +458,15 @@ class ReportsScreen(QWidget):
 
     def quick_stock_in(self, part_id, name, shortage):
         from PySide6.QtWidgets import QInputDialog
+        suggested = max(1, int(shortage)) if shortage else 1
         qty, ok = QInputDialog.getInt(
-            self, "Quick Stock In",
-            f"Add stock for {name}:\n(Suggested: {shortage} to reach reorder level)",
-            value=shortage, min=1, max=100000
+            self,
+            "Quick Stock In",
+            f"Add stock for {name}:\n(Suggested: {suggested} to reach reorder level)",
+            suggested,
+            1,
+            100000,
+            1
         )
         if ok and qty > 0:
             if record_stock_in(part_id, qty):
