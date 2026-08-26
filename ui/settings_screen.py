@@ -1,10 +1,13 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QFileDialog, QMessageBox, QGroupBox, QFormLayout
+    QPushButton, QTextEdit, QFileDialog, QMessageBox, QFrame, QFormLayout
 )
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt
 from managers.settings_manager import get_all_settings, update_settings
+from ui.theme import (
+    COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE
+)
 
 
 class SettingsScreen(QWidget):
@@ -21,15 +24,41 @@ class SettingsScreen(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.addWidget(QLabel("<h2>Shop Settings</h2>"))
-        layout.addWidget(QLabel(
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(16)
+
+        header_box = QVBoxLayout()
+        header_box.setSpacing(2)
+        title = QLabel("Shop Settings")
+        title.setStyleSheet(f"font-size: 22px; font-weight: 800; color: {COLOR_TEXT_PRIMARY};")
+        subtitle = QLabel(
             "These values appear on printed receipts and, over time, "
             "elsewhere in the app. Changes take effect on the next receipt printed."
-        ))
+        )
+        subtitle.setStyleSheet(f"font-size: 13px; color: {COLOR_TEXT_SECONDARY};")
+        subtitle.setWordWrap(True)
+        header_box.addWidget(title)
+        header_box.addWidget(subtitle)
+        layout.addLayout(header_box)
 
-        group = QGroupBox("Branding")
-        form = QFormLayout(group)
+        group = QFrame()
+        group.setStyleSheet(f"""
+            QFrame {{
+                background-color: #FFFFFF;
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 8px;
+                padding: 16px;
+            }}
+        """)
+        group_layout = QVBoxLayout(group)
+        group_layout.setSpacing(12)
+
+        branding_title = QLabel("Branding")
+        branding_title.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
+        group_layout.addWidget(branding_title)
+
+        form = QFormLayout()
+        form.setSpacing(10)
 
         self.shop_name_input = QLineEdit()
         form.addRow("Shop Name:", self.shop_name_input)
@@ -44,11 +73,10 @@ class SettingsScreen(QWidget):
         self.footer_input.setMaximumHeight(60)
         form.addRow("Receipt Footer:", self.footer_input)
 
-        # --- Logo picker ---
         logo_row = QHBoxLayout()
         self.logo_preview = QLabel("No logo set")
         self.logo_preview.setFixedSize(80, 80)
-        self.logo_preview.setStyleSheet("border: 1px solid #ccc; background: white;")
+        self.logo_preview.setStyleSheet(f"border: 1px solid {COLOR_BORDER}; background: white; border-radius: 6px;")
         self.logo_preview.setAlignment(Qt.AlignCenter)
         logo_row.addWidget(self.logo_preview)
 
@@ -64,13 +92,22 @@ class SettingsScreen(QWidget):
         logo_row.addStretch()
 
         form.addRow("Logo:", logo_row)
-
+        group_layout.addLayout(form)
         layout.addWidget(group)
 
         self.save_btn = QPushButton("Save Settings")
-        self.save_btn.setStyleSheet(
-            "background-color: #27ae60; color: white; font-weight: bold; padding: 10px;"
-        )
+        self.save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_PRIMARY_ORANGE};
+                color: white;
+                font-weight: bold;
+                border-radius: 6px;
+                padding: 10px 18px;
+            }}
+            QPushButton:hover {{
+                background-color: #EA580C;
+            }}
+        """)
         self.save_btn.clicked.connect(self.save_settings)
         layout.addWidget(self.save_btn)
 

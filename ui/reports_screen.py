@@ -1,14 +1,14 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
-    QDateEdit, QComboBox, QSplitter, QSpinBox, QMessageBox
+    QDateEdit, QComboBox, QSpinBox, QMessageBox, QFrame
 )
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QColor
 from datetime import date
 from managers.reports_manager import (
     get_daily_sales_summary, get_monthly_sales_summary,
-    get_daily_transactions, get_monthly_transactions,
+    get_monthly_transactions,
     get_top_selling_parts, get_low_stock_parts, get_profit_margin_report
 )
 from managers.inventory_manager import record_stock_in
@@ -19,6 +19,10 @@ from managers.wishlist_manager import (
 from models.wishlist_item import WishlistItem, PRIORITY_LEVELS
 from utils.reorder_export import generate_reorder_pdf
 from ui.sales_trend_chart import SalesTrendChart
+from ui.theme import (
+    StockBadgeDelegate, COLOR_BORDER, COLOR_TEXT_PRIMARY,
+    COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE, COLOR_SUCCESS
+)
 
 class ReportsScreen(QWidget):
     def __init__(self, current_user, parent=None):
@@ -28,7 +32,18 @@ class ReportsScreen(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("<h3>Reports & Analytics</h3>"))
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(16)
+
+        header_box = QVBoxLayout()
+        header_box.setSpacing(2)
+        title = QLabel("Reports & Analytics")
+        title.setStyleSheet(f"font-size: 22px; font-weight: 800; color: {COLOR_TEXT_PRIMARY};")
+        subtitle = QLabel("Sales summaries, stock alerts, profit margins, and reorder planning.")
+        subtitle.setStyleSheet(f"font-size: 13px; color: {COLOR_TEXT_SECONDARY};")
+        header_box.addWidget(title)
+        header_box.addWidget(subtitle)
+        layout.addLayout(header_box)
 
         tabs = QTabWidget()
         tabs.addTab(self._build_sales_tab(), "Sales Summary")
@@ -47,7 +62,9 @@ class ReportsScreen(QWidget):
         controls = QHBoxLayout()
 
         # Date picker for daily report
-        controls.addWidget(QLabel("<b>Select Day:</b>"))
+        day_label = QLabel("Select Day:")
+        day_label.setStyleSheet(f"font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
+        controls.addWidget(day_label)
         self.daily_date = QDateEdit(QDate.currentDate())
         self.daily_date.setCalendarPopup(True)
         self.daily_date.setDisplayFormat("yyyy-MM-dd")
@@ -58,7 +75,9 @@ class ReportsScreen(QWidget):
         run_daily_btn.clicked.connect(self.run_daily_report)
         controls.addWidget(run_daily_btn)
 
-        controls.addWidget(QLabel("   |   <b>Select Month:</b>"))
+        month_label = QLabel("Select Month:")
+        month_label.setStyleSheet(f"font-weight: 700; color: {COLOR_TEXT_PRIMARY}; margin-left: 12px;")
+        controls.addWidget(month_label)
         self.month_combo = QComboBox()
         for i, m in enumerate(["January","February","March","April","May","June",
                                 "July","August","September","October","November","December"], 1):
@@ -79,29 +98,27 @@ class ReportsScreen(QWidget):
         layout.addLayout(controls)
 
         # KPI Summary Card
-        self.summary_card = QWidget()
-        self.summary_card.setStyleSheet("""
-            QWidget {
-                background-color: #2c3e50;
-                color: white;
-                border-radius: 6px;
-                padding: 10px;
-            }
-            QLabel {
-                color: white;
-            }
+        self.summary_card = QFrame()
+        self.summary_card.setStyleSheet(f"""
+            QFrame {{
+                background-color: #FFFFFF;
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 8px;
+                padding: 12px;
+            }}
         """)
         card_layout = QVBoxLayout(self.summary_card)
-        self.summary_title = QLabel("<b>Sales Summary</b>")
-        self.summary_title.setStyleSheet("font-size: 15px; font-weight: bold;")
+        card_layout.setSpacing(6)
+        self.summary_title = QLabel("Sales Summary")
+        self.summary_title.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
         card_layout.addWidget(self.summary_title)
 
         self.summary_stats = QLabel("Select a date or month above to view transactions.")
-        self.summary_stats.setStyleSheet("font-size: 13px;")
+        self.summary_stats.setStyleSheet(f"font-size: 13px; color: {COLOR_TEXT_SECONDARY};")
         card_layout.addWidget(self.summary_stats)
 
         self.payment_breakdown_label = QLabel("")
-        self.payment_breakdown_label.setStyleSheet("font-size: 12px; color: #ecf0f1; padding-top: 4px;")
+        self.payment_breakdown_label.setStyleSheet(f"font-size: 12px; color: {COLOR_TEXT_SECONDARY}; padding-top: 4px;")
         card_layout.addWidget(self.payment_breakdown_label)
 
         layout.addWidget(self.summary_card)
@@ -112,7 +129,8 @@ class ReportsScreen(QWidget):
         # Tab 1: Detailed Transactions List
         self.tx_tab_widget = QWidget()
         tx_layout = QVBoxLayout(self.tx_tab_widget)
-        self.tx_table_header = QLabel("<b>Transactions List:</b>")
+        self.tx_table_header = QLabel("Transactions List:")
+        self.tx_table_header.setStyleSheet(f"font-size: 14px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
         tx_layout.addWidget(self.tx_table_header)
 
         self.tx_table = self._make_table([
@@ -125,8 +143,8 @@ class ReportsScreen(QWidget):
         # Tab 2: Monthly Day-by-Day Breakdown
         self.monthly_breakdown_widget = QWidget()
         m_layout = QVBoxLayout(self.monthly_breakdown_widget)
-        hint = QLabel("<i>Tip: Double-click any day below to view its individual transactions.</i>")
-        hint.setStyleSheet("color: #7f8c8d; font-size: 11px;")
+        hint = QLabel("Tip: Double-click any day below to view its individual transactions.")
+        hint.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 11px; font-style: italic;")
         m_layout.addWidget(hint)
 
         self.daily_breakdown_table = self._make_table([
@@ -139,7 +157,9 @@ class ReportsScreen(QWidget):
         # Tab 3: Sales Trend Graph (FR-22)
         self.chart_tab_widget = QWidget()
         chart_layout = QVBoxLayout(self.chart_tab_widget)
-        chart_layout.addWidget(QLabel("<b>Revenue Trend (Daily):</b>"))
+        chart_title = QLabel("Revenue Trend (Daily):")
+        chart_title.setStyleSheet(f"font-size: 14px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
+        chart_layout.addWidget(chart_title)
         self.sales_chart = SalesTrendChart()
         chart_layout.addWidget(self.sales_chart)
         self.sales_subtabs.addTab(self.chart_tab_widget, "Sales Trend Graph")
@@ -162,19 +182,19 @@ class ReportsScreen(QWidget):
         card_rev = result["card_revenue"]
         txs = result.get("transactions", [])
 
-        self.summary_title.setText(f"Daily Sales Report: <b>{d}</b>")
+        self.summary_title.setText(f"Daily Sales Report: {d}")
         self.summary_stats.setText(
-            f"Total Cash/Revenue Earned: <b style='font-size:16px; color:#2ecc71;'>${total_rev:.2f}</b>   |   "
-            f"Total Transactions: <b>{tx_count}</b>   |   "
-            f"Total Items Sold: <b>{result.get('total_items', 0)}</b>"
+            f"Total Cash/Revenue Earned: ${total_rev:.2f}   |   "
+            f"Total Transactions: {tx_count}   |   "
+            f"Total Items Sold: {result.get('total_items', 0)}"
         )
         self.payment_breakdown_label.setText(
-            f"Payment Breakdown:  Cash: <b>${cash_rev:.2f}</b>   |   "
-            f"EcoCash: <b>${eco_rev:.2f}</b>   |   "
-            f"Card: <b>${card_rev:.2f}</b>"
+            f"Payment Breakdown:  Cash: ${cash_rev:.2f}   |   "
+            f"EcoCash: ${eco_rev:.2f}   |   "
+            f"Card: ${card_rev:.2f}"
         )
 
-        self.tx_table_header.setText(f"<b>Every Transaction on {d} ({len(txs)} total):</b>")
+        self.tx_table_header.setText(f"Every Transaction on {d} ({len(txs)} total):")
         self._populate_transactions_table(txs, show_date=False)
 
         # Clear monthly breakdown table when running a single day
@@ -197,20 +217,20 @@ class ReportsScreen(QWidget):
         eco_rev = sum(r.get("ecocash_revenue", 0) for r in day_rows)
         card_rev = sum(r.get("card_revenue", 0) for r in day_rows)
 
-        self.summary_title.setText(f"Monthly Sales Report: <b>{month_name} {year}</b>")
+        self.summary_title.setText(f"Monthly Sales Report: {month_name} {year}")
         self.summary_stats.setText(
-            f"Total Cash/Revenue Earned: <b style='font-size:16px; color:#2ecc71;'>${total_rev:.2f}</b>   |   "
-            f"Total Transactions: <b>{total_tx}</b>   |   "
-            f"Days with Sales: <b>{len(day_rows)}</b>"
+            f"Total Cash/Revenue Earned: ${total_rev:.2f}   |   "
+            f"Total Transactions: {total_tx}   |   "
+            f"Days with Sales: {len(day_rows)}"
         )
         self.payment_breakdown_label.setText(
-            f"Payment Breakdown:  Cash: <b>${cash_rev:.2f}</b>   |   "
-            f"EcoCash: <b>${eco_rev:.2f}</b>   |   "
-            f"Card: <b>${card_rev:.2f}</b>"
+            f"Payment Breakdown:  Cash: ${cash_rev:.2f}   |   "
+            f"EcoCash: ${eco_rev:.2f}   |   "
+            f"Card: ${card_rev:.2f}"
         )
 
         # 1. Populate all individual transactions in the month
-        self.tx_table_header.setText(f"<b>Every Transaction in {month_name} {year} ({len(all_txs)} total):</b>")
+        self.tx_table_header.setText(f"Every Transaction in {month_name} {year} ({len(all_txs)} total):")
         self._populate_transactions_table(all_txs, show_date=True)
 
         # 2. Populate day-by-day summary
@@ -244,11 +264,11 @@ class ReportsScreen(QWidget):
             # Payment method styling
             pay_item = QTableWidgetItem(tx["payment_method"])
             if tx["payment_method"] == "Cash":
-                pay_item.setForeground(QColor("#27ae60"))
+                pay_item.setForeground(QColor(COLOR_SUCCESS))
             elif tx["payment_method"] == "EcoCash":
-                pay_item.setForeground(QColor("#2980b9"))
+                pay_item.setForeground(QColor("#0284C7"))
             elif tx["payment_method"] == "Card":
-                pay_item.setForeground(QColor("#8e44ad"))
+                pay_item.setForeground(QColor("#7C3AED"))
             self.tx_table.setItem(row, 6, pay_item)
 
             amount_item = QTableWidgetItem(f"${tx['total_amount']:.2f}")
@@ -317,7 +337,18 @@ class ReportsScreen(QWidget):
         top_bar.addWidget(refresh_btn)
 
         export_btn = QPushButton("Export Reorder List (PDF)")
-        export_btn.setStyleSheet("background-color: #2980b9; color: white; font-weight: bold; padding: 6px;")
+        export_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_PRIMARY_ORANGE};
+                color: white;
+                font-weight: bold;
+                border-radius: 6px;
+                padding: 6px 14px;
+            }}
+            QPushButton:hover {{
+                background-color: #EA580C;
+            }}
+        """)
         export_btn.clicked.connect(self.export_reorder_list)
         top_bar.addWidget(export_btn)
 
@@ -327,13 +358,16 @@ class ReportsScreen(QWidget):
         self.low_stock_table = self._make_table(
             ["Part #", "Name", "Brand", "Category", "On Hand", "Reorder Level", "Shortage", "Action"]
         )
+        self.low_stock_table.setItemDelegateForColumn(4, StockBadgeDelegate(self.low_stock_table))
         layout.addWidget(self.low_stock_table)
         self.load_low_stock()
 
         # --- Reorder Wishlist section (FR-21) ---
         # Manually-added items for parts that are unavailable or not yet
         # catalogued, so they don't get missed on the next supplier visit.
-        layout.addWidget(QLabel("<b>Reorder Wishlist</b> \u2014 unavailable or uncatalogued items:"))
+        wishlist_heading = QLabel("Reorder Wishlist \u2014 unavailable or uncatalogued items:")
+        wishlist_heading.setStyleSheet(f"font-size: 14px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
+        layout.addWidget(wishlist_heading)
 
         wishlist_bar = QHBoxLayout()
         add_wishlist_btn = QPushButton("Add Wishlist Item")
@@ -440,8 +474,7 @@ class ReportsScreen(QWidget):
             self.low_stock_table.setItem(i, 3, QTableWidgetItem(r["category"]))
 
             qty_item = QTableWidgetItem(str(r["quantity_on_hand"]))
-            qty_item.setBackground(QColor("#f8d7da"))
-            qty_item.setTextAlignment(Qt.AlignCenter)
+            qty_item.setData(Qt.UserRole + 1, True)
             self.low_stock_table.setItem(i, 4, qty_item)
 
             self.low_stock_table.setItem(i, 5, QTableWidgetItem(str(r["reorder_level"])))
@@ -533,8 +566,9 @@ class ReportsScreen(QWidget):
     def _make_table(self, headers):
         t = QTableWidget()
         t.setColumnCount(len(headers))
-        t.setHorizontalHeaderLabels(headers)
+        t.setHorizontalHeaderLabels([h.upper() for h in headers])
         t.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         t.setEditTriggers(QTableWidget.NoEditTriggers)
         t.setSelectionBehavior(QTableWidget.SelectRows)
+        t.verticalHeader().setVisible(False)
         return t

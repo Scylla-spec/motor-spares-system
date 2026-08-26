@@ -18,8 +18,10 @@ def main():
     # 3. Setup GUI Application
     app = QApplication(sys.argv)
     
-    # Optional: Set a basic global style
+    # Set global modern ERP theme
+    from ui.theme import GLOBAL_APP_QSS
     app.setStyle("Fusion")
+    app.setStyleSheet(GLOBAL_APP_QSS)
     
     # 4. Show Login Window
     login = LoginWindow()
