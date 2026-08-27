@@ -1,29 +1,32 @@
 """
-Modernized Point of Sale (POS) Screen for Motor Spares System.
+Point of Sale (POS) Screen for Motor Spares System.
 Features:
-- Two-column clean layout (Part Search on left, Cart & Checkout on right)
-- Stock pill badges on search results
-- Modern Totals & Payment Summary Card
-- Prominent checkout actions
+- Streamlined two-column layout (Part Catalog on left, Active Order Cart on right)
+- Distinct, unmistakable +/- quantity controls in cart
+- Immediate stock availability badges
+- Support for immediate checkout (Cash, EcoCash, Card) and Pay Later (On Credit)
+- Clean, high-contrast, emoji-free modern UI
 """
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-    QMessageBox, QComboBox, QSpinBox, QSplitter, QFrame
+    QMessageBox, QComboBox, QSplitter, QFrame, QInputDialog
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QFont
 
 from models.user import User
 from models.sale import SaleItem
 from managers.inventory_manager import search_parts, get_all_parts
 from managers.sales_manager import process_sale
 from managers.customer_manager import get_all_customers
+from managers.credit_manager import create_credit_order
 from ui.theme import (
-    StockBadgeDelegate, COLOR_BORDER, COLOR_TEXT_PRIMARY,
-    COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE, COLOR_SUCCESS
+    StockBadgeDelegate, QuantityStepper, COLOR_BORDER, COLOR_TEXT_PRIMARY,
+    COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE
 )
+
 
 class POSScreen(QWidget):
     def __init__(self, current_user: User, parent=None):
@@ -32,55 +35,57 @@ class POSScreen(QWidget):
         self.cart_items = {}  # part_id -> SaleItem
         self._customers = []  # cached customer list
         self.setup_ui()
-        self.perform_search("")  # Load initial parts
+        self.perform_search("")  # Load initial catalog
         self.refresh_customers()
 
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(24, 20, 24, 20)
-        main_layout.setSpacing(14)
+        main_layout.setContentsMargins(20, 16, 20, 16)
+        main_layout.setSpacing(12)
 
         # Header
         header_box = QVBoxLayout()
         header_box.setSpacing(2)
         title = QLabel("Point of Sale")
-        title.setStyleSheet(f"font-size: 22px; font-weight: 800; color: {COLOR_TEXT_PRIMARY};")
-        subtitle = QLabel("Search parts, build orders, and process customer checkout.")
-        subtitle.setStyleSheet(f"font-size: 13px; color: {COLOR_TEXT_SECONDARY};")
+        title.setStyleSheet(f"font-size: 20px; font-weight: 800; color: {COLOR_TEXT_PRIMARY};")
+        subtitle = QLabel("Search parts, build active orders, and process customer checkout.")
+        subtitle.setStyleSheet(f"font-size: 12px; color: {COLOR_TEXT_SECONDARY};")
         header_box.addWidget(title)
         header_box.addWidget(subtitle)
         main_layout.addLayout(header_box)
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.setStyleSheet("QSplitter::handle { background-color: #E2E8F0; width: 2px; }")
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(splitter, 1)
 
         # --- LEFT PANEL: Search and Inventory ---
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0, 0, 10, 0)
-        left_layout.setSpacing(10)
+        left_layout.setContentsMargins(0, 0, 8, 0)
+        left_layout.setSpacing(8)
 
         left_header = QLabel("Part Catalog")
-        left_header.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
+        left_header.setStyleSheet(f"font-size: 14px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
         left_layout.addWidget(left_header)
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 Scan or type part number, name, brand...")
-        self.search_input.setFixedHeight(36)
+        self.search_input.setPlaceholderText("Scan barcode or search by part#, name, brand...")
+        self.search_input.setFixedHeight(34)
         self.search_input.textChanged.connect(self.perform_search)
         left_layout.addWidget(self.search_input)
 
         self.results_table = QTableWidget()
         self.results_table.setColumnCount(5)
-        self.results_table.setHorizontalHeaderLabels(["PART #", "NAME", "PRICE", "STOCK", "ACTION"])
+        self.results_table.setHorizontalHeaderLabels(["Part#", "Name", "Price", "Stock", "Action"])
         header = self.results_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.Fixed)
+        self.results_table.setColumnWidth(4, 75)
         self.results_table.verticalHeader().setVisible(False)
+        self.results_table.verticalHeader().setDefaultSectionSize(36)
         self.results_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.results_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.results_table.setItemDelegateForColumn(3, StockBadgeDelegate(self.results_table))
@@ -91,23 +96,27 @@ class POSScreen(QWidget):
         # --- RIGHT PANEL: Cart & Checkout ---
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(10, 0, 0, 0)
-        right_layout.setSpacing(10)
+        right_layout.setContentsMargins(8, 0, 0, 0)
+        right_layout.setSpacing(8)
 
         right_header = QLabel("Active Order Cart")
-        right_header.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
+        right_header.setStyleSheet(f"font-size: 14px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
         right_layout.addWidget(right_header)
 
         self.cart_table = QTableWidget()
         self.cart_table.setColumnCount(5)
-        self.cart_table.setHorizontalHeaderLabels(["PART #", "NAME", "QTY", "SUBTOTAL", "ACTION"])
+        self.cart_table.setHorizontalHeaderLabels(["Part#", "Name", "Quantity", "Subtotal", "Action"])
         c_header = self.cart_table.horizontalHeader()
         c_header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         c_header.setSectionResizeMode(1, QHeaderView.Stretch)
-        c_header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        c_header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        c_header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        c_header.setSectionResizeMode(2, QHeaderView.Fixed)
+        self.cart_table.setColumnWidth(2, 120)
+        c_header.setSectionResizeMode(3, QHeaderView.Fixed)
+        self.cart_table.setColumnWidth(3, 75)
+        c_header.setSectionResizeMode(4, QHeaderView.Fixed)
+        self.cart_table.setColumnWidth(4, 65)
         self.cart_table.verticalHeader().setVisible(False)
+        self.cart_table.verticalHeader().setDefaultSectionSize(38)
         self.cart_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.cart_table.setEditTriggers(QTableWidget.NoEditTriggers)
         right_layout.addWidget(self.cart_table)
@@ -119,17 +128,17 @@ class POSScreen(QWidget):
                 background-color: #FFFFFF;
                 border: 1px solid {COLOR_BORDER};
                 border-radius: 8px;
-                padding: 12px;
+                padding: 10px;
             }}
         """)
         card_layout = QVBoxLayout(checkout_card)
-        card_layout.setSpacing(10)
+        card_layout.setSpacing(8)
 
         # Total amount label
         self.total_label = QLabel("Total: $0.00")
         self.total_label.setAlignment(Qt.AlignRight)
         self.total_label.setStyleSheet(f"""
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 800;
             color: {COLOR_TEXT_PRIMARY};
         """)
@@ -137,7 +146,7 @@ class POSScreen(QWidget):
 
         # Customer & Payment fields
         form_row = QHBoxLayout()
-        form_row.setSpacing(10)
+        form_row.setSpacing(8)
 
         cust_box = QVBoxLayout()
         cust_label = QLabel("Customer:")
@@ -151,7 +160,7 @@ class POSScreen(QWidget):
         pay_label = QLabel("Payment Method:")
         pay_label.setStyleSheet(f"font-size: 11px; font-weight: 700; color: {COLOR_TEXT_SECONDARY};")
         self.payment_combo = QComboBox()
-        self.payment_combo.addItems(["Cash", "EcoCash", "Card"])
+        self.payment_combo.addItems(["Cash", "EcoCash", "Card", "Pay Later (On Credit)"])
         pay_box.addWidget(pay_label)
         pay_box.addWidget(self.payment_combo)
         form_row.addLayout(pay_box)
@@ -160,17 +169,18 @@ class POSScreen(QWidget):
 
         # Action Buttons
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(10)
+        btn_row.setSpacing(8)
 
-        self.cancel_sale_btn = QPushButton("Cancel Order")
-        self.cancel_sale_btn.setFixedHeight(42)
+        self.cancel_sale_btn = QPushButton("Clear Cart")
+        self.cancel_sale_btn.setFixedHeight(38)
         self.cancel_sale_btn.setStyleSheet("""
             QPushButton {
                 background-color: #FFFFFF;
                 color: #EF4444;
                 border: 1px solid #FECACA;
-                font-weight: 600;
+                font-weight: 700;
                 border-radius: 6px;
+                padding: 6px 12px;
             }
             QPushButton:hover {
                 background-color: #FEF2F2;
@@ -180,16 +190,17 @@ class POSScreen(QWidget):
         btn_row.addWidget(self.cancel_sale_btn)
 
         self.checkout_btn = QPushButton("Complete Sale")
-        self.checkout_btn.setFixedHeight(42)
+        self.checkout_btn.setFixedHeight(38)
         self.checkout_btn.setCursor(Qt.PointingHandCursor)
         self.checkout_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLOR_PRIMARY_ORANGE};
                 color: white;
                 font-weight: 700;
-                font-size: 14px;
+                font-size: 13px;
                 border: none;
                 border-radius: 6px;
+                padding: 6px 16px;
             }}
             QPushButton:hover {{
                 background-color: #EA580C;
@@ -202,7 +213,7 @@ class POSScreen(QWidget):
 
         right_layout.addWidget(checkout_card)
         splitter.addWidget(right_widget)
-        splitter.setSizes([550, 450])
+        splitter.setSizes([560, 440])
 
     def refresh_customers(self):
         self._customers = get_all_customers()
@@ -233,20 +244,33 @@ class POSScreen(QWidget):
             stock_item.setData(Qt.UserRole + 1, part.is_low_stock())
             self.results_table.setItem(row, 3, stock_item)
 
+            add_widget = QWidget()
+            add_layout = QHBoxLayout(add_widget)
+            add_layout.setContentsMargins(2, 2, 2, 2)
+            add_layout.setAlignment(Qt.AlignCenter)
+
             add_btn = QPushButton("+ Add")
-            add_btn.setFixedHeight(26)
+            add_btn.setFixedHeight(28)
+            add_btn.setMinimumWidth(56)
             add_btn.setEnabled(part.quantity_on_hand > 0)
             if part.quantity_on_hand > 0:
+                add_btn.setCursor(Qt.PointingHandCursor)
                 add_btn.setStyleSheet(f"""
                     QPushButton {{
                         background-color: {COLOR_PRIMARY_ORANGE};
                         color: white;
-                        font-weight: bold;
+                        font-weight: 700;
+                        font-size: 11px;
                         border-radius: 4px;
+                        padding: 2px 6px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: #EA580C;
                     }}
                 """)
             add_btn.clicked.connect(lambda checked, p=part: self.add_to_cart(p))
-            self.results_table.setCellWidget(row, 4, add_btn)
+            add_layout.addWidget(add_btn)
+            self.results_table.setCellWidget(row, 4, add_widget)
 
     def add_to_cart(self, part):
         if part.part_id in self.cart_items:
@@ -279,32 +303,40 @@ class POSScreen(QWidget):
 
             self.cart_table.setItem(row, 1, QTableWidgetItem(item.part_name))
 
-            qty_spin = QSpinBox()
-            qty_spin.setMinimum(1)
-            qty_spin.setMaximum(100000)
-            qty_spin.setValue(item.quantity)
-            qty_spin.setFixedHeight(28)
-            qty_spin.valueChanged.connect(lambda val, pid=part_id: self.change_cart_qty(pid, val))
-            self.cart_table.setCellWidget(row, 2, qty_spin)
+            # Unmistakable +/- quantity stepper
+            stepper = QuantityStepper(value=item.quantity, min_val=1, max_val=100000)
+            stepper.set_on_change(lambda val, pid=part_id: self.change_cart_qty(pid, val))
+            self.cart_table.setCellWidget(row, 2, stepper)
 
             self.cart_table.setItem(row, 3, QTableWidgetItem(f"${item.subtotal:.2f}"))
 
-            remove_btn = QPushButton("✕")
-            remove_btn.setToolTip("Remove from cart")
-            remove_btn.setFixedSize(28, 28)
+            # Centered 🗑 Delete button
+            del_widget = QWidget()
+            del_layout = QHBoxLayout(del_widget)
+            del_layout.setContentsMargins(2, 2, 2, 2)
+            del_layout.setAlignment(Qt.AlignCenter)
+
+            remove_btn = QPushButton("🗑")
+            remove_btn.setToolTip("Delete from cart")
+            remove_btn.setFixedSize(30, 28)
+            remove_btn.setCursor(Qt.PointingHandCursor)
             remove_btn.setStyleSheet("""
                 QPushButton {
-                    color: #EF4444;
+                    color: #DC2626;
+                    background-color: #FFFFFF;
                     border: 1px solid #FECACA;
                     border-radius: 4px;
-                    font-weight: bold;
+                    font-size: 14px;
+                    padding: 0px;
                 }
                 QPushButton:hover {
                     background-color: #FEF2F2;
+                    border-color: #F87171;
                 }
             """)
             remove_btn.clicked.connect(lambda checked, pid=part_id: self.remove_from_cart(pid))
-            self.cart_table.setCellWidget(row, 4, remove_btn)
+            del_layout.addWidget(remove_btn)
+            self.cart_table.setCellWidget(row, 4, del_widget)
 
             total_amount += item.subtotal
 
@@ -313,6 +345,7 @@ class POSScreen(QWidget):
     def change_cart_qty(self, part_id, new_qty):
         if part_id in self.cart_items:
             self.cart_items[part_id].quantity = new_qty
+            # Update subtotal cell directly or refresh
             self.update_cart_display()
 
     def remove_from_cart(self, part_id):
@@ -324,7 +357,7 @@ class POSScreen(QWidget):
         if not self.cart_items:
             return
         confirm = QMessageBox.question(
-            self, "Cancel Sale",
+            self, "Clear Cart",
             "Discard the current cart? This cannot be undone.",
             QMessageBox.Yes | QMessageBox.No
         )
@@ -341,6 +374,49 @@ class POSScreen(QWidget):
         customer_id = self.customer_combo.currentData()
         customer_name = self.customer_combo.currentText()
         items = list(self.cart_items.values())
+
+        if payment_method == "Pay Later (On Credit)":
+            # Handle credit order
+            if customer_name == "Walk-in":
+                # Prompt for customer name
+                cust_input, ok = QInputDialog.getText(
+                    self, "Customer Name Required",
+                    "Please enter the customer's name for this credit transaction:"
+                )
+                if not ok or not cust_input.strip():
+                    QMessageBox.warning(self, "Required", "Customer name is required for credit transactions.")
+                    return
+                customer_name = cust_input.strip()
+
+            credit_items = [
+                {
+                    "part_id": it.part_id,
+                    "part_number": it.part_number,
+                    "part_name": it.part_name,
+                    "quantity": it.quantity,
+                    "unit_price": it.unit_price
+                }
+                for it in items
+            ]
+            success, msg, credit_id = create_credit_order(
+                customer_name=customer_name,
+                items=credit_items,
+                cashier_id=self.current_user.user_id,
+                customer_id=customer_id
+            )
+            if success:
+                QMessageBox.information(
+                    self, "Credit Order Created",
+                    f"Credit Order #{credit_id} recorded for {customer_name}!\n"
+                    f"This transaction is now logged under the 'Pay Later / On Credit' tab as Pending."
+                )
+                self.cart_items.clear()
+                self.update_cart_display()
+                self.search_input.clear()
+                self.perform_search("")
+            else:
+                QMessageBox.critical(self, "Credit Order Failed", msg)
+            return
 
         success, result_msg = process_sale(
             cart_items=items,

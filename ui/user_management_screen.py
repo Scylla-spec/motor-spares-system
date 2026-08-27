@@ -56,7 +56,7 @@ class UserManagementScreen(QWidget):
 
         self.user_table = QTableWidget()
         self.user_table.setColumnCount(4)
-        self.user_table.setHorizontalHeaderLabels(["ID", "USERNAME", "ROLE", "PASSWORD HASH"])
+        self.user_table.setHorizontalHeaderLabels(["ID", "Username", "Role", "Password Hash"])
         self.user_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.user_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.user_table.setEditTriggers(QTableWidget.NoEditTriggers)

@@ -10,3 +10,4 @@ backups/
 exports/
 receipts/
 reorder_exports/
+*.csv

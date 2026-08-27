@@ -437,7 +437,7 @@ class InventoryScreen(QWidget):
         toolbar_layout.setSpacing(10)
 
         # Filters Label
-        filter_icon_label = QLabel("⚡ FILTERS:")
+        filter_icon_label = QLabel("FILTERS:")
         filter_icon_label.setStyleSheet(f"""
             font-weight: 800;
             font-size: 11px;
@@ -486,7 +486,7 @@ class InventoryScreen(QWidget):
         self.add_part_btn.clicked.connect(self.open_add_dialog)
         toolbar_layout.addWidget(self.add_part_btn)
 
-        self.export_csv_btn = QPushButton("⤓ Export CSV")
+        self.export_csv_btn = QPushButton("Export CSV")
         self.export_csv_btn.setToolTip("Export currently displayed parts to CSV file")
         self.export_csv_btn.clicked.connect(self.export_to_csv)
         toolbar_layout.addWidget(self.export_csv_btn)
@@ -507,7 +507,7 @@ class InventoryScreen(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels([
-            "PART #", "NAME", "CATEGORY", "BRAND", "UNIT PRICE", "STOCK", "ACTIONS"
+            "Part#", "Name", "Category", "Brand", "Price", "Stock", "Actions"
         ])
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -522,6 +522,7 @@ class InventoryScreen(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setItemDelegateForColumn(5, StockBadgeDelegate(self.table))
+        self.table.verticalHeader().setDefaultSectionSize(40)
 
         layout.addWidget(self.table)
 
@@ -541,7 +542,7 @@ class InventoryScreen(QWidget):
         footer_layout.addStretch()
 
         # Pagination Buttons
-        self.prev_page_btn = QPushButton("‹")
+        self.prev_page_btn = QPushButton("<")
         self.prev_page_btn.setFixedSize(30, 30)
         self.prev_page_btn.clicked.connect(self.prev_page)
         footer_layout.addWidget(self.prev_page_btn)
@@ -559,7 +560,7 @@ class InventoryScreen(QWidget):
         """)
         footer_layout.addWidget(self.page_indicator_btn)
 
-        self.next_page_btn = QPushButton("›")
+        self.next_page_btn = QPushButton(">")
         self.next_page_btn.setFixedSize(30, 30)
         self.next_page_btn.clicked.connect(self.next_page)
         footer_layout.addWidget(self.next_page_btn)
@@ -699,31 +700,99 @@ class InventoryScreen(QWidget):
             stock_item.setData(Qt.UserRole + 1, part.is_low_stock())
             self.table.setItem(row, 5, stock_item)
 
-            # 6: ACTIONS
+            # 6: ACTIONS - Centered, professional, clean ERP styling
             action_widget = QWidget()
             action_layout = QHBoxLayout(action_widget)
             action_layout.setContentsMargins(4, 2, 4, 2)
             action_layout.setSpacing(6)
+            action_layout.setAlignment(Qt.AlignCenter)
 
             edit_btn = QPushButton("Edit")
-            edit_btn.setFixedHeight(26)
+            edit_btn.setFixedHeight(28)
+            edit_btn.setMinimumWidth(56)
+            edit_btn.setCursor(Qt.PointingHandCursor)
+            edit_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FFFFFF;
+                    color: #0F172A;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 4px;
+                    font-weight: 600;
+                    font-size: 12px;
+                    padding: 2px 8px;
+                }
+                QPushButton:hover {
+                    background-color: #F1F5F9;
+                    border-color: #94A3B8;
+                }
+            """)
             edit_btn.clicked.connect(lambda checked, p=part: self.open_edit_dialog(p))
             action_layout.addWidget(edit_btn)
 
             stock_in_btn = QPushButton("+ Stock")
-            stock_in_btn.setFixedHeight(26)
+            stock_in_btn.setFixedHeight(28)
+            stock_in_btn.setMinimumWidth(68)
+            stock_in_btn.setCursor(Qt.PointingHandCursor)
+            stock_in_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FFFFFF;
+                    color: #15803D;
+                    border: 1px solid #86EFAC;
+                    border-radius: 4px;
+                    font-weight: 600;
+                    font-size: 12px;
+                    padding: 2px 8px;
+                }
+                QPushButton:hover {
+                    background-color: #F0FDF4;
+                    border-color: #4ADE80;
+                }
+            """)
             stock_in_btn.clicked.connect(lambda checked, p=part: self.open_stock_in_dialog(p))
             action_layout.addWidget(stock_in_btn)
 
             adjust_btn = QPushButton("Adjust")
-            adjust_btn.setFixedHeight(26)
+            adjust_btn.setFixedHeight(28)
+            adjust_btn.setMinimumWidth(60)
+            adjust_btn.setCursor(Qt.PointingHandCursor)
+            adjust_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FFFFFF;
+                    color: #475569;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 4px;
+                    font-weight: 600;
+                    font-size: 12px;
+                    padding: 2px 8px;
+                }
+                QPushButton:hover {
+                    background-color: #F8FAFC;
+                    border-color: #94A3B8;
+                }
+            """)
             adjust_btn.clicked.connect(lambda checked, p=part: self.open_adjust_dialog(p))
             action_layout.addWidget(adjust_btn)
 
             if self.current_user.is_admin():
-                del_btn = QPushButton("Deactivate")
-                del_btn.setFixedHeight(26)
-                del_btn.setStyleSheet("color: #EF4444; border-color: #FECACA;")
+                del_btn = QPushButton("🗑 Delete")
+                del_btn.setFixedHeight(28)
+                del_btn.setMinimumWidth(76)
+                del_btn.setCursor(Qt.PointingHandCursor)
+                del_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #FFFFFF;
+                        color: #DC2626;
+                        border: 1px solid #FECACA;
+                        border-radius: 4px;
+                        font-weight: 600;
+                        font-size: 12px;
+                        padding: 2px 8px;
+                    }
+                    QPushButton:hover {
+                        background-color: #FEF2F2;
+                        border-color: #F87171;
+                    }
+                """)
                 del_btn.clicked.connect(lambda checked, p=part: self.deactivate(p))
                 action_layout.addWidget(del_btn)
 

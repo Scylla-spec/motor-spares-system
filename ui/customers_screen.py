@@ -187,7 +187,7 @@ class CustomersScreen(QWidget):
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["ID", "NAME", "PHONE", "CREDIT BALANCE", "ACTIONS"])
+        self.table.setHorizontalHeaderLabels(["ID", "Name", "Phone", "Credit Balance", "Actions"])
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -197,6 +197,7 @@ class CustomersScreen(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.verticalHeader().setDefaultSectionSize(40)
 
         layout.addWidget(self.table)
 
@@ -217,14 +218,49 @@ class CustomersScreen(QWidget):
             action_widget = QWidget()
             action_layout = QHBoxLayout(action_widget)
             action_layout.setContentsMargins(4, 2, 4, 2)
-            action_layout.setSpacing(6)
+            action_layout.setSpacing(8)
+            action_layout.setAlignment(Qt.AlignCenter)
 
             edit_btn = QPushButton("Edit")
-            edit_btn.setFixedHeight(26)
+            edit_btn.setFixedHeight(28)
+            edit_btn.setMinimumWidth(65)
+            edit_btn.setCursor(Qt.PointingHandCursor)
+            edit_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FFFFFF;
+                    color: #0F172A;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 4px;
+                    font-weight: 600;
+                    font-size: 12px;
+                    padding: 2px 10px;
+                }
+                QPushButton:hover {
+                    background-color: #F1F5F9;
+                    border-color: #94A3B8;
+                }
+            """)
             edit_btn.clicked.connect(lambda checked, c=cust: self.open_edit_dialog(c))
 
-            history_btn = QPushButton("View History")
-            history_btn.setFixedHeight(26)
+            history_btn = QPushButton("History")
+            history_btn.setFixedHeight(28)
+            history_btn.setMinimumWidth(75)
+            history_btn.setCursor(Qt.PointingHandCursor)
+            history_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FFFFFF;
+                    color: #475569;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 4px;
+                    font-weight: 600;
+                    font-size: 12px;
+                    padding: 2px 10px;
+                }
+                QPushButton:hover {
+                    background-color: #F8FAFC;
+                    border-color: #94A3B8;
+                }
+            """)
             history_btn.clicked.connect(lambda checked, c=cust: self.open_history_dialog(c))
 
             action_layout.addWidget(edit_btn)

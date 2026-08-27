@@ -173,6 +173,41 @@ def initialize_database():
             );
         """)
 
+        # 12. CreditOrder Table — goods given to customers on credit (pay later)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS CreditOrder (
+                credit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                customer_id INTEGER,
+                customer_name TEXT NOT NULL,
+                customer_phone TEXT,
+                total_amount REAL NOT NULL CHECK(total_amount >= 0),
+                amount_paid REAL NOT NULL DEFAULT 0.0,
+                status TEXT CHECK(status IN ('Pending', 'Paid')) NOT NULL DEFAULT 'Pending',
+                created_at TEXT NOT NULL,
+                due_date TEXT,
+                paid_at TEXT,
+                cashier_id INTEGER,
+                notes TEXT,
+                FOREIGN KEY (customer_id) REFERENCES Customer(customer_id) ON DELETE SET NULL,
+                FOREIGN KEY (cashier_id) REFERENCES User(user_id) ON DELETE SET NULL
+            );
+        """)
+
+        # 13. CreditOrderItem Table — items associated with a credit order
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS CreditOrderItem (
+                item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                credit_id INTEGER NOT NULL,
+                part_id INTEGER NOT NULL,
+                part_number TEXT,
+                part_name TEXT,
+                quantity INTEGER NOT NULL CHECK(quantity > 0),
+                unit_price REAL NOT NULL,
+                FOREIGN KEY (credit_id) REFERENCES CreditOrder(credit_id) ON DELETE CASCADE,
+                FOREIGN KEY (part_id) REFERENCES Part(part_id) ON DELETE RESTRICT
+            );
+        """)
+
         # Seed default branding values on first run only (won't overwrite
         # values an Admin has already changed via the Settings screen).
         default_settings = {

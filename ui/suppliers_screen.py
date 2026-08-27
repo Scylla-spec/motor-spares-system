@@ -230,7 +230,7 @@ class SuppliersScreen(QWidget):
 
         self.sup_table = QTableWidget()
         self.sup_table.setColumnCount(4)
-        self.sup_table.setHorizontalHeaderLabels(["ID", "NAME", "PHONE", "ACTIONS"])
+        self.sup_table.setHorizontalHeaderLabels(["ID", "Name", "Contact Phone", "Actions"])
         sup_hdr = self.sup_table.horizontalHeader()
         sup_hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         sup_hdr.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -270,7 +270,7 @@ class SuppliersScreen(QWidget):
 
         self.po_table = QTableWidget()
         self.po_table.setColumnCount(6)
-        self.po_table.setHorizontalHeaderLabels(["PO NUMBER", "SUPPLIER", "DATE", "EST. TOTAL", "STATUS", "ACTIONS"])
+        self.po_table.setHorizontalHeaderLabels(["PO Number", "Supplier", "Date", "Est. Total", "Status", "Actions"])
         po_hdr = self.po_table.horizontalHeader()
         po_hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         po_hdr.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -287,6 +287,7 @@ class SuppliersScreen(QWidget):
     def load_suppliers(self):
         self.suppliers_list = get_all_suppliers()
         self.sup_table.setRowCount(len(self.suppliers_list))
+        self.sup_table.verticalHeader().setDefaultSectionSize(40)
         for row, sup in enumerate(self.suppliers_list):
             id_item = QTableWidgetItem(f"#{sup.supplier_id}")
             font = QFont()
@@ -297,14 +298,38 @@ class SuppliersScreen(QWidget):
             self.sup_table.setItem(row, 1, QTableWidgetItem(sup.name))
             self.sup_table.setItem(row, 2, QTableWidgetItem(sup.contact_phone or "—"))
 
+            edit_widget = QWidget()
+            edit_layout = QHBoxLayout(edit_widget)
+            edit_layout.setContentsMargins(4, 2, 4, 2)
+            edit_layout.setAlignment(Qt.AlignCenter)
+
             edit_btn = QPushButton("Edit")
-            edit_btn.setFixedHeight(26)
+            edit_btn.setFixedHeight(28)
+            edit_btn.setMinimumWidth(70)
+            edit_btn.setCursor(Qt.PointingHandCursor)
+            edit_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FFFFFF;
+                    color: #0F172A;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 4px;
+                    font-weight: 600;
+                    font-size: 12px;
+                    padding: 2px 10px;
+                }
+                QPushButton:hover {
+                    background-color: #F1F5F9;
+                    border-color: #94A3B8;
+                }
+            """)
             edit_btn.clicked.connect(lambda checked, s=sup: self.open_edit_supplier(s))
-            self.sup_table.setCellWidget(row, 3, edit_btn)
+            edit_layout.addWidget(edit_btn)
+            self.sup_table.setCellWidget(row, 3, edit_widget)
 
     def load_pos(self):
         pos = get_all_pos()
         self.po_table.setRowCount(len(pos))
+        self.po_table.verticalHeader().setDefaultSectionSize(40)
         for row, po in enumerate(pos):
             num_item = QTableWidgetItem(po.po_number or str(po.po_id))
             font = QFont()
@@ -329,15 +354,38 @@ class SuppliersScreen(QWidget):
             action_widget = QWidget()
             action_layout = QHBoxLayout(action_widget)
             action_layout.setContentsMargins(4, 2, 4, 2)
+            action_layout.setAlignment(Qt.AlignCenter)
 
             if po.status != "Received":
                 next_status = "Ordered" if po.status == "Draft" else "Received"
-                status_btn = QPushButton(f"Mark {next_status}")
-                status_btn.setFixedHeight(26)
+                status_btn = QPushButton(f"Mark as {next_status}")
+                status_btn.setFixedHeight(28)
+                status_btn.setMinimumWidth(110)
+                status_btn.setCursor(Qt.PointingHandCursor)
+                color = "#B45309" if next_status == "Ordered" else "#15803D"
+                border = "#FCD34D" if next_status == "Ordered" else "#86EFAC"
+                hover_bg = "#FEF3C7" if next_status == "Ordered" else "#F0FDF4"
+                status_btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: #FFFFFF;
+                        color: {color};
+                        border: 1px solid {border};
+                        border-radius: 4px;
+                        font-weight: 600;
+                        font-size: 12px;
+                        padding: 2px 10px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {hover_bg};
+                    }}
+                """)
                 status_btn.clicked.connect(lambda checked, p=po, ns=next_status: self.update_po(p.po_id, ns))
                 action_layout.addWidget(status_btn)
 
             self.po_table.setCellWidget(row, 5, action_widget)
+
+
+
 
     def open_add_supplier(self):
         dialog = AddEditSupplierDialog(self)

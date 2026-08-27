@@ -566,7 +566,7 @@ class ReportsScreen(QWidget):
     def _make_table(self, headers):
         t = QTableWidget()
         t.setColumnCount(len(headers))
-        t.setHorizontalHeaderLabels([h.upper() for h in headers])
+        t.setHorizontalHeaderLabels(headers)
         t.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         t.setEditTriggers(QTableWidget.NoEditTriggers)
         t.setSelectionBehavior(QTableWidget.SelectRows)

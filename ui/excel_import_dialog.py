@@ -63,11 +63,11 @@ class ExcelImportDialog(QDialog):
 
         # Navigation buttons
         btn_bar = QHBoxLayout()
-        self.back_btn = QPushButton("◀  Back")
+        self.back_btn = QPushButton("Back")
         self.back_btn.setEnabled(False)
         self.back_btn.clicked.connect(self.go_back)
 
-        self.next_btn = QPushButton("Preview  ▶")
+        self.next_btn = QPushButton("Preview")
         self.next_btn.clicked.connect(self.go_next)
 
         self.close_btn = QPushButton("Close")
