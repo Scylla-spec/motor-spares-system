@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
-from managers.auth_manager import get_all_users, create_user
+from managers.auth_manager import get_all_users, create_user, delete_user
 from managers.backup_manager import backup_database
 from utils.validators import validate_new_user
 from ui.theme import (
@@ -55,9 +55,15 @@ class UserManagementScreen(QWidget):
         left_layout.addWidget(users_heading)
 
         self.user_table = QTableWidget()
-        self.user_table.setColumnCount(4)
-        self.user_table.setHorizontalHeaderLabels(["ID", "Username", "Role", "Password Hash"])
-        self.user_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.user_table.setColumnCount(5)
+        self.user_table.setHorizontalHeaderLabels(["ID", "Username", "Role", "Password Hash", "Action"])
+        u_header = self.user_table.horizontalHeader()
+        u_header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        u_header.setSectionResizeMode(1, QHeaderView.Stretch)
+        u_header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        u_header.setSectionResizeMode(3, QHeaderView.Stretch)
+        u_header.setSectionResizeMode(4, QHeaderView.Fixed)
+        self.user_table.setColumnWidth(4, 90)
         self.user_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.user_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.user_table.verticalHeader().setVisible(False)
@@ -149,6 +155,47 @@ class UserManagementScreen(QWidget):
             self.user_table.setItem(row, 1, QTableWidgetItem(user.username))
             self.user_table.setItem(row, 2, QTableWidgetItem(user.role))
             self.user_table.setItem(row, 3, QTableWidgetItem(user.password_hash[:15] + "..."))
+
+            del_widget = QWidget()
+            del_layout = QHBoxLayout(del_widget)
+            del_layout.setContentsMargins(4, 2, 4, 2)
+            del_layout.setAlignment(Qt.AlignCenter)
+
+            del_btn = QPushButton("Delete")
+            del_btn.setFixedSize(70, 28)
+            del_btn.setCursor(Qt.PointingHandCursor)
+            del_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FFFFFF;
+                    color: #EF4444;
+                    font-weight: 700;
+                    font-size: 11px;
+                    border: 1px solid #FECACA;
+                    border-radius: 4px;
+                    padding: 0px;
+                }
+                QPushButton:hover {
+                    background-color: #FEF2F2;
+                    border-color: #EF4444;
+                }
+            """)
+            del_btn.clicked.connect(lambda checked, u=user: self.on_delete_user(u))
+            del_layout.addWidget(del_btn)
+            self.user_table.setCellWidget(row, 4, del_widget)
+
+    def on_delete_user(self, user):
+        reply = QMessageBox.question(
+            self, "Confirm Delete",
+            f"Are you sure you want to delete user '{user.username}' (ID: {user.user_id})?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            success, msg = delete_user(user.user_id)
+            if success:
+                QMessageBox.information(self, "Success", msg)
+                self.load_users()
+            else:
+                QMessageBox.warning(self, "Delete Failed", msg)
 
     def run_backup(self):
         success, result = backup_database()

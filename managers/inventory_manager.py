@@ -51,6 +51,31 @@ def add_part(part: Part) -> bool:
         conn.close()
 
 
+def bulk_update_category_prices(category_name: str, percentage_change: float) -> Tuple[bool, int]:
+    """Adjusts selling prices for all parts in a category by a percentage (e.g. +5.0 or -3.0). Returns (success, count_updated)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        factor = 1.0 + (percentage_change / 100.0)
+        if category_name == "All Categories" or not category_name:
+            cursor.execute("UPDATE Part SET selling_price = ROUND(selling_price * ?, 2);", (factor,))
+        else:
+            cursor.execute(
+                "UPDATE Part SET selling_price = ROUND(selling_price * ?, 2) WHERE UPPER(category) = UPPER(?);",
+                (factor, category_name.strip())
+            )
+        count = cursor.rowcount
+        conn.commit()
+        logging.info(f"Bulk price update: {count} parts updated by {percentage_change}% in category '{category_name}'.")
+        return True, count
+    except sqlite3.Error as e:
+        logging.error(f"Error bulk updating category prices: {e}")
+        conn.rollback()
+        return False, 0
+    finally:
+        conn.close()
+
+
 def update_part(part: Part, user_id: int) -> bool:
     """Updates an existing part. Logs price changes."""
     part.part_number = normalize_part_number(part.part_number)

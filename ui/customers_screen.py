@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 from models.customer import Customer
-from managers.customer_manager import add_customer, update_customer, get_all_customers, get_customer_purchase_history
+from managers.customer_manager import add_customer, update_customer, get_all_customers, get_customer_purchase_history, delete_customer
 from utils.validators import validate_required_name
 from ui.theme import (
     COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE
@@ -266,7 +266,43 @@ class CustomersScreen(QWidget):
             action_layout.addWidget(edit_btn)
             action_layout.addWidget(history_btn)
 
+            if self.current_user and self.current_user.is_admin():
+                del_btn = QPushButton("Delete")
+                del_btn.setFixedHeight(28)
+                del_btn.setMinimumWidth(65)
+                del_btn.setCursor(Qt.PointingHandCursor)
+                del_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #FFFFFF;
+                        color: #EF4444;
+                        font-weight: 700;
+                        font-size: 12px;
+                        border: 1px solid #FECACA;
+                        border-radius: 4px;
+                        padding: 2px 8px;
+                    }
+                    QPushButton:hover {
+                        background-color: #FEF2F2;
+                        border-color: #EF4444;
+                    }
+                """)
+                del_btn.clicked.connect(lambda checked, c=cust: self.delete_customer_action(c))
+                action_layout.addWidget(del_btn)
+
             self.table.setCellWidget(row, 4, action_widget)
+
+    def delete_customer_action(self, customer):
+        reply = QMessageBox.question(
+            self, "Confirm Delete",
+            f"Are you sure you want to delete customer '{customer.name}'?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            if delete_customer(customer.customer_id):
+                QMessageBox.information(self, "Success", f"Customer '{customer.name}' deleted successfully.")
+                self.load_customers()
+            else:
+                QMessageBox.critical(self, "Error", "Failed to delete customer.")
 
     def open_add_dialog(self):
         dialog = AddEditCustomerDialog(self)

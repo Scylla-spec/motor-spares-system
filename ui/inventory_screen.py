@@ -504,23 +504,24 @@ class InventoryScreen(QWidget):
         # 3. Modern Data Table
         # -------------------------------------------------------------
         self.table = QTableWidget()
-        self.table.setColumnCount(7)
+        self.table.setColumnCount(8)
         self.table.setHorizontalHeaderLabels([
-            "Part#", "Name", "Category", "Brand", "Price", "Stock", "Actions"
+            "#", "Part#", "Name", "Category", "Brand", "Price", "Stock", "Actions"
         ])
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(7, QHeaderView.ResizeToContents)
         
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setItemDelegateForColumn(5, StockBadgeDelegate(self.table))
+        self.table.setItemDelegateForColumn(6, StockBadgeDelegate(self.table))
         self.table.verticalHeader().setDefaultSectionSize(40)
 
         layout.addWidget(self.table)
@@ -684,33 +685,39 @@ class InventoryScreen(QWidget):
         try:
             self.table.setRowCount(len(page_parts))
             for row, part in enumerate(page_parts):
-                # 0: PART # (Bold mono-style)
+                # 0: ROW # INDEX
+                row_idx_item = QTableWidgetItem(str(start_idx + row + 1))
+                row_idx_item.setForeground(QColor("#64748B"))
+                row_idx_item.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(row, 0, row_idx_item)
+
+                # 1: PART # (Bold mono-style)
                 part_num_item = QTableWidgetItem(part.part_number)
                 part_num_font = QFont()
                 part_num_font.setBold(True)
                 part_num_item.setFont(part_num_font)
-                self.table.setItem(row, 0, part_num_item)
+                self.table.setItem(row, 1, part_num_item)
 
-                # 1: NAME
-                self.table.setItem(row, 1, QTableWidgetItem(part.name))
+                # 2: NAME
+                self.table.setItem(row, 2, QTableWidgetItem(part.name))
 
-                # 2: CATEGORY
-                self.table.setItem(row, 2, QTableWidgetItem(part.category or "—"))
+                # 3: CATEGORY
+                self.table.setItem(row, 3, QTableWidgetItem(part.category or "—"))
 
-                # 3: BRAND
-                self.table.setItem(row, 3, QTableWidgetItem(part.brand or "—"))
+                # 4: BRAND
+                self.table.setItem(row, 4, QTableWidgetItem(part.brand or "—"))
 
-                # 4: UNIT PRICE
+                # 5: UNIT PRICE
                 price_item = QTableWidgetItem(f"${part.selling_price:.2f}")
                 price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                self.table.setItem(row, 4, price_item)
+                self.table.setItem(row, 5, price_item)
 
-                # 5: STOCK (Rendered via StockBadgeDelegate)
+                # 6: STOCK (Rendered via StockBadgeDelegate on column 6)
                 stock_item = QTableWidgetItem(str(part.quantity_on_hand))
                 stock_item.setData(Qt.UserRole + 1, part.is_low_stock())
-                self.table.setItem(row, 5, stock_item)
+                self.table.setItem(row, 6, stock_item)
 
-                # 6: ACTIONS - Centered, professional, clean ERP styling
+                # 7: ACTIONS - Centered, professional, clean ERP styling
                 action_widget = QWidget()
                 action_layout = QHBoxLayout(action_widget)
                 action_layout.setContentsMargins(4, 2, 4, 2)
@@ -800,13 +807,13 @@ class InventoryScreen(QWidget):
                         }
                         QPushButton:hover {
                             background-color: #FEF2F2;
-                            border-color: #F87171;
+                            border-color: #EF4444;
                         }
                     """)
-                    del_btn.clicked.connect(lambda checked, p=part: self.deactivate(p))
+                    del_btn.clicked.connect(lambda checked, p=part: self.delete_part_action(p))
                     action_layout.addWidget(del_btn)
 
-                self.table.setCellWidget(row, 6, action_widget)
+                self.table.setCellWidget(row, 7, action_widget)
         finally:
             self.table.setUpdatesEnabled(True)
 

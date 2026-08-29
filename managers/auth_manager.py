@@ -186,6 +186,35 @@ def get_all_users() -> list[User]:
         conn.close()
 
 
+def delete_user(user_id: int) -> Tuple[bool, str]:
+    """Deletes a user by ID. Ensures at least one Admin account remains in the system."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT role FROM User WHERE user_id = ?;", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return False, "User not found."
+        
+        target_role = row["role"]
+        if target_role == "Admin":
+            cursor.execute("SELECT COUNT(*) FROM User WHERE role = 'Admin';")
+            admin_count = cursor.fetchone()[0]
+            if admin_count <= 1:
+                return False, "Cannot delete the only remaining Admin account."
+
+        cursor.execute("DELETE FROM User WHERE user_id = ?;", (user_id,))
+        conn.commit()
+        logging.info(f"User ID {user_id} deleted successfully.")
+        return True, "User deleted successfully."
+    except sqlite3.Error as e:
+        logging.error(f"Error deleting user {user_id}: {e}")
+        conn.rollback()
+        return False, f"Database error: {e}"
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     ensure_default_admin()
     # Test authentication

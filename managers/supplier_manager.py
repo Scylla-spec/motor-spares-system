@@ -62,3 +62,20 @@ def get_all_suppliers() -> List[Supplier]:
         return []
     finally:
         conn.close()
+
+
+def delete_supplier(supplier_id: int) -> bool:
+    """Deletes a supplier."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM Supplier WHERE supplier_id = ?;", (supplier_id,))
+        conn.commit()
+        logging.info(f"Supplier ID {supplier_id} deleted successfully.")
+        return True
+    except sqlite3.Error as e:
+        logging.error(f"Database error deleting supplier: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()

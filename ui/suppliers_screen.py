@@ -12,7 +12,7 @@ from PySide6.QtGui import QColor, QFont
 
 from models.supplier import Supplier
 from models.purchase_order import PurchaseOrder
-from managers.supplier_manager import add_supplier, update_supplier, get_all_suppliers
+from managers.supplier_manager import add_supplier, update_supplier, get_all_suppliers, delete_supplier
 from managers.purchase_order_manager import create_po, update_po_status, get_all_pos
 from utils.validators import validate_required_name
 from ui.theme import (
@@ -324,7 +324,44 @@ class SuppliersScreen(QWidget):
             """)
             edit_btn.clicked.connect(lambda checked, s=sup: self.open_edit_supplier(s))
             edit_layout.addWidget(edit_btn)
+
+            if self.current_user and self.current_user.is_admin():
+                del_btn = QPushButton("Delete")
+                del_btn.setFixedHeight(28)
+                del_btn.setMinimumWidth(65)
+                del_btn.setCursor(Qt.PointingHandCursor)
+                del_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #FFFFFF;
+                        color: #EF4444;
+                        font-weight: 700;
+                        font-size: 12px;
+                        border: 1px solid #FECACA;
+                        border-radius: 4px;
+                        padding: 2px 8px;
+                    }
+                    QPushButton:hover {
+                        background-color: #FEF2F2;
+                        border-color: #EF4444;
+                    }
+                """)
+                del_btn.clicked.connect(lambda checked, s=sup: self.delete_supplier_action(s))
+                edit_layout.addWidget(del_btn)
+
             self.sup_table.setCellWidget(row, 3, edit_widget)
+
+    def delete_supplier_action(self, supplier):
+        reply = QMessageBox.question(
+            self, "Confirm Delete",
+            f"Are you sure you want to delete supplier '{supplier.name}'?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            if delete_supplier(supplier.supplier_id):
+                QMessageBox.information(self, "Success", f"Supplier '{supplier.name}' deleted successfully.")
+                self.load_suppliers()
+            else:
+                QMessageBox.critical(self, "Error", "Failed to delete supplier.")
 
     def load_pos(self):
         pos = get_all_pos()

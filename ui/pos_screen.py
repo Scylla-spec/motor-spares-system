@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QComboBox, QSplitter, QFrame, QInputDialog
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QColor
 
 from models.user import User
 from models.sale import SaleItem
@@ -75,20 +75,21 @@ class POSScreen(QWidget):
         left_layout.addWidget(self.search_input)
 
         self.results_table = QTableWidget()
-        self.results_table.setColumnCount(5)
-        self.results_table.setHorizontalHeaderLabels(["Part#", "Name", "Price", "Stock", "Action"])
+        self.results_table.setColumnCount(6)
+        self.results_table.setHorizontalHeaderLabels(["#", "Part#", "Name", "Price", "Stock", "Action"])
         header = self.results_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.Fixed)
-        self.results_table.setColumnWidth(4, 100)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.Fixed)
+        self.results_table.setColumnWidth(5, 100)
         self.results_table.verticalHeader().setVisible(False)
         self.results_table.verticalHeader().setDefaultSectionSize(44)
         self.results_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.results_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.results_table.setItemDelegateForColumn(3, StockBadgeDelegate(self.results_table))
+        self.results_table.setItemDelegateForColumn(4, StockBadgeDelegate(self.results_table))
         left_layout.addWidget(self.results_table)
 
         splitter.addWidget(left_widget)
@@ -236,19 +237,31 @@ class POSScreen(QWidget):
         try:
             self.results_table.setRowCount(len(display_results))
             for row, part in enumerate(display_results):
+                # 0: ROW # INDEX
+                row_idx_item = QTableWidgetItem(str(row + 1))
+                row_idx_item.setForeground(QColor("#64748B"))
+                row_idx_item.setTextAlignment(Qt.AlignCenter)
+                self.results_table.setItem(row, 0, row_idx_item)
+
+                # 1: PART #
                 part_num_item = QTableWidgetItem(part.part_number)
                 font = QFont()
                 font.setBold(True)
                 part_num_item.setFont(font)
-                self.results_table.setItem(row, 0, part_num_item)
+                self.results_table.setItem(row, 1, part_num_item)
 
-                self.results_table.setItem(row, 1, QTableWidgetItem(part.name))
-                self.results_table.setItem(row, 2, QTableWidgetItem(f"${part.selling_price:.2f}"))
+                # 2: NAME
+                self.results_table.setItem(row, 2, QTableWidgetItem(part.name))
 
+                # 3: PRICE
+                self.results_table.setItem(row, 3, QTableWidgetItem(f"${part.selling_price:.2f}"))
+
+                # 4: STOCK (StockBadgeDelegate on Column 4)
                 stock_item = QTableWidgetItem(str(part.quantity_on_hand))
                 stock_item.setData(Qt.UserRole + 1, part.is_low_stock())
-                self.results_table.setItem(row, 3, stock_item)
+                self.results_table.setItem(row, 4, stock_item)
 
+                # 5: ACTION
                 add_widget = QWidget()
                 add_layout = QHBoxLayout(add_widget)
                 add_layout.setContentsMargins(4, 2, 4, 2)
@@ -294,7 +307,7 @@ class POSScreen(QWidget):
                     """)
                     add_layout.addWidget(disabled_btn)
 
-                self.results_table.setCellWidget(row, 4, add_widget)
+                self.results_table.setCellWidget(row, 5, add_widget)
         finally:
             self.results_table.setUpdatesEnabled(True)
 

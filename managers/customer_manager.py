@@ -92,3 +92,20 @@ def get_customer_purchase_history(customer_id: int) -> List[Dict[str, Any]]:
         return []
     finally:
         conn.close()
+
+
+def delete_customer(customer_id: int) -> bool:
+    """Deletes a customer profile."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM Customer WHERE customer_id = ?;", (customer_id,))
+        conn.commit()
+        logging.info(f"Customer ID {customer_id} deleted successfully.")
+        return True
+    except sqlite3.Error as e:
+        logging.error(f"Database error deleting customer: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
