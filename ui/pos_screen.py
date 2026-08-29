@@ -83,9 +83,9 @@ class POSScreen(QWidget):
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.Fixed)
-        self.results_table.setColumnWidth(4, 75)
+        self.results_table.setColumnWidth(4, 100)
         self.results_table.verticalHeader().setVisible(False)
-        self.results_table.verticalHeader().setDefaultSectionSize(36)
+        self.results_table.verticalHeader().setDefaultSectionSize(44)
         self.results_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.results_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.results_table.setItemDelegateForColumn(3, StockBadgeDelegate(self.results_table))
@@ -109,12 +109,12 @@ class POSScreen(QWidget):
         c_header = self.cart_table.horizontalHeader()
         c_header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         c_header.setSectionResizeMode(1, QHeaderView.Stretch)
-        c_header.setSectionResizeMode(2, QHeaderView.Fixed)
-        self.cart_table.setColumnWidth(2, 120)
-        c_header.setSectionResizeMode(3, QHeaderView.Fixed)
-        self.cart_table.setColumnWidth(3, 75)
+        c_header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.cart_table.setColumnWidth(2, 130)
+        c_header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.cart_table.setColumnWidth(3, 90)
         c_header.setSectionResizeMode(4, QHeaderView.Fixed)
-        self.cart_table.setColumnWidth(4, 65)
+        self.cart_table.setColumnWidth(4, 75)
         self.cart_table.verticalHeader().setVisible(False)
         self.cart_table.verticalHeader().setDefaultSectionSize(38)
         self.cart_table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -223,54 +223,80 @@ class POSScreen(QWidget):
             self.customer_combo.addItem(c.name, c.customer_id)
 
     def perform_search(self, text):
-        if not text.strip():
+        text_clean = text.strip()
+        if not text_clean:
             results = get_all_parts()
         else:
-            results = search_parts(text)
+            results = search_parts(text_clean)
 
         active_results = [p for p in results if not p.name.startswith("[DEACTIVATED]")]
-        self.results_table.setRowCount(len(active_results))
-        for row, part in enumerate(active_results):
-            part_num_item = QTableWidgetItem(part.part_number)
-            font = QFont()
-            font.setBold(True)
-            part_num_item.setFont(font)
-            self.results_table.setItem(row, 0, part_num_item)
+        display_results = active_results[:150]
 
-            self.results_table.setItem(row, 1, QTableWidgetItem(part.name))
-            self.results_table.setItem(row, 2, QTableWidgetItem(f"${part.selling_price:.2f}"))
+        self.results_table.setUpdatesEnabled(False)
+        try:
+            self.results_table.setRowCount(len(display_results))
+            for row, part in enumerate(display_results):
+                part_num_item = QTableWidgetItem(part.part_number)
+                font = QFont()
+                font.setBold(True)
+                part_num_item.setFont(font)
+                self.results_table.setItem(row, 0, part_num_item)
 
-            stock_item = QTableWidgetItem(str(part.quantity_on_hand))
-            stock_item.setData(Qt.UserRole + 1, part.is_low_stock())
-            self.results_table.setItem(row, 3, stock_item)
+                self.results_table.setItem(row, 1, QTableWidgetItem(part.name))
+                self.results_table.setItem(row, 2, QTableWidgetItem(f"${part.selling_price:.2f}"))
 
-            add_widget = QWidget()
-            add_layout = QHBoxLayout(add_widget)
-            add_layout.setContentsMargins(2, 2, 2, 2)
-            add_layout.setAlignment(Qt.AlignCenter)
+                stock_item = QTableWidgetItem(str(part.quantity_on_hand))
+                stock_item.setData(Qt.UserRole + 1, part.is_low_stock())
+                self.results_table.setItem(row, 3, stock_item)
 
-            add_btn = QPushButton("+ Add")
-            add_btn.setFixedHeight(28)
-            add_btn.setMinimumWidth(56)
-            add_btn.setEnabled(part.quantity_on_hand > 0)
-            if part.quantity_on_hand > 0:
-                add_btn.setCursor(Qt.PointingHandCursor)
-                add_btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: {COLOR_PRIMARY_ORANGE};
-                        color: white;
-                        font-weight: 700;
-                        font-size: 11px;
-                        border-radius: 4px;
-                        padding: 2px 6px;
-                    }}
-                    QPushButton:hover {{
-                        background-color: #EA580C;
-                    }}
-                """)
-            add_btn.clicked.connect(lambda checked, p=part: self.add_to_cart(p))
-            add_layout.addWidget(add_btn)
-            self.results_table.setCellWidget(row, 4, add_widget)
+                add_widget = QWidget()
+                add_layout = QHBoxLayout(add_widget)
+                add_layout.setContentsMargins(4, 2, 4, 2)
+                add_layout.setAlignment(Qt.AlignCenter)
+
+                if part.quantity_on_hand > 0:
+                    add_btn = QPushButton("+ Add")
+                    add_btn.setFixedSize(72, 34)
+                    add_btn.setCursor(Qt.PointingHandCursor)
+                    add_btn.setStyleSheet(f"""
+                        QPushButton {{
+                            background-color: {COLOR_PRIMARY_ORANGE};
+                            color: #FFFFFF;
+                            font-weight: 700;
+                            font-size: 13px;
+                            border: none;
+                            border-radius: 5px;
+                            padding: 0px;
+                        }}
+                        QPushButton:hover {{
+                            background-color: #EA580C;
+                        }}
+                        QPushButton:pressed {{
+                            background-color: #C2410C;
+                        }}
+                    """)
+                    add_btn.clicked.connect(lambda checked, p=part: self.add_to_cart(p))
+                    add_layout.addWidget(add_btn)
+                else:
+                    disabled_btn = QPushButton("Out of Stock")
+                    disabled_btn.setFixedSize(84, 34)
+                    disabled_btn.setEnabled(False)
+                    disabled_btn.setStyleSheet("""
+                        QPushButton {
+                            background-color: #F1F5F9;
+                            color: #94A3B8;
+                            font-weight: 600;
+                            font-size: 11px;
+                            border: 1px solid #E2E8F0;
+                            border-radius: 5px;
+                            padding: 0px;
+                        }
+                    """)
+                    add_layout.addWidget(disabled_btn)
+
+                self.results_table.setCellWidget(row, 4, add_widget)
+        finally:
+            self.results_table.setUpdatesEnabled(True)
 
     def add_to_cart(self, part):
         if part.part_id in self.cart_items:

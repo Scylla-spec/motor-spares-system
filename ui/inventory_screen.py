@@ -29,7 +29,8 @@ from ui.image_import_dialog import ImageImportDialog
 from utils.validators import validate_part
 from ui.theme import (
     MetricStatCard, StockBadgeDelegate, create_primary_action_button,
-    COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE
+    COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE,
+    PlusMinusSpinBox
 )
 
 
@@ -201,9 +202,7 @@ class QuickStockInSelectorDialog(QDialog):
             self.part_combo.addItem(f"{p.part_number} - {p.name} (Current: {p.quantity_on_hand})", p)
         form.addRow("Select Part:", self.part_combo)
 
-        self.quantity = QSpinBox()
-        self.quantity.setRange(1, 100000)
-        self.quantity.setValue(10)
+        self.quantity = PlusMinusSpinBox(1, 100000, 10)
         form.addRow("Add Quantity:", self.quantity)
 
         layout.addLayout(form)
@@ -648,10 +647,12 @@ class InventoryScreen(QWidget):
             val_str = f"${total_val:,.2f}"
         self.total_value_card.set_value(val_str)
 
+    PAGE_SIZE = 100
+
     def render_table_page(self):
         total_items = len(self.filtered_parts)
         total_pages = max(1, (total_items + self.PAGE_SIZE - 1) // self.PAGE_SIZE)
-        
+
         if self.current_page > total_pages:
             self.current_page = total_pages
         if self.current_page < 1:
@@ -661,142 +662,153 @@ class InventoryScreen(QWidget):
         end_idx = min(start_idx + self.PAGE_SIZE, total_items)
         page_parts = self.filtered_parts[start_idx:end_idx]
 
-        # Update footer text
+        # Update footer text & page buttons
         if total_items == 0:
             self.footer_entries_label.setText("Showing 0 to 0 of 0 entries")
         else:
             self.footer_entries_label.setText(f"Showing {start_idx + 1} to {end_idx} of {total_items:,} entries")
 
-        self.page_indicator_btn.setText(str(self.current_page))
-        self.prev_page_btn.setEnabled(self.current_page > 1)
-        self.next_page_btn.setEnabled(self.current_page < total_pages)
+        if hasattr(self, "prev_page_btn"):
+            self.prev_page_btn.show()
+            self.prev_page_btn.setEnabled(self.current_page > 1)
+        if hasattr(self, "page_indicator_btn"):
+            self.page_indicator_btn.show()
+            self.page_indicator_btn.setText(f"{self.current_page} / {total_pages}")
+            self.page_indicator_btn.setFixedWidth(80)
+        if hasattr(self, "next_page_btn"):
+            self.next_page_btn.show()
+            self.next_page_btn.setEnabled(self.current_page < total_pages)
 
-        # Render rows
-        self.table.setRowCount(len(page_parts))
-        for row, part in enumerate(page_parts):
-            # 0: PART # (Bold mono-style)
-            part_num_item = QTableWidgetItem(part.part_number)
-            part_num_font = QFont()
-            part_num_font.setBold(True)
-            part_num_item.setFont(part_num_font)
-            self.table.setItem(row, 0, part_num_item)
+        # Render rows smoothly
+        self.table.setUpdatesEnabled(False)
+        try:
+            self.table.setRowCount(len(page_parts))
+            for row, part in enumerate(page_parts):
+                # 0: PART # (Bold mono-style)
+                part_num_item = QTableWidgetItem(part.part_number)
+                part_num_font = QFont()
+                part_num_font.setBold(True)
+                part_num_item.setFont(part_num_font)
+                self.table.setItem(row, 0, part_num_item)
 
-            # 1: NAME
-            self.table.setItem(row, 1, QTableWidgetItem(part.name))
+                # 1: NAME
+                self.table.setItem(row, 1, QTableWidgetItem(part.name))
 
-            # 2: CATEGORY
-            self.table.setItem(row, 2, QTableWidgetItem(part.category or "—"))
+                # 2: CATEGORY
+                self.table.setItem(row, 2, QTableWidgetItem(part.category or "—"))
 
-            # 3: BRAND
-            self.table.setItem(row, 3, QTableWidgetItem(part.brand or "—"))
+                # 3: BRAND
+                self.table.setItem(row, 3, QTableWidgetItem(part.brand or "—"))
 
-            # 4: UNIT PRICE
-            price_item = QTableWidgetItem(f"${part.selling_price:.2f}")
-            price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            self.table.setItem(row, 4, price_item)
+                # 4: UNIT PRICE
+                price_item = QTableWidgetItem(f"${part.selling_price:.2f}")
+                price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                self.table.setItem(row, 4, price_item)
 
-            # 5: STOCK (Rendered via StockBadgeDelegate)
-            stock_item = QTableWidgetItem(str(part.quantity_on_hand))
-            stock_item.setData(Qt.UserRole + 1, part.is_low_stock())
-            self.table.setItem(row, 5, stock_item)
+                # 5: STOCK (Rendered via StockBadgeDelegate)
+                stock_item = QTableWidgetItem(str(part.quantity_on_hand))
+                stock_item.setData(Qt.UserRole + 1, part.is_low_stock())
+                self.table.setItem(row, 5, stock_item)
 
-            # 6: ACTIONS - Centered, professional, clean ERP styling
-            action_widget = QWidget()
-            action_layout = QHBoxLayout(action_widget)
-            action_layout.setContentsMargins(4, 2, 4, 2)
-            action_layout.setSpacing(6)
-            action_layout.setAlignment(Qt.AlignCenter)
+                # 6: ACTIONS - Centered, professional, clean ERP styling
+                action_widget = QWidget()
+                action_layout = QHBoxLayout(action_widget)
+                action_layout.setContentsMargins(4, 2, 4, 2)
+                action_layout.setSpacing(6)
+                action_layout.setAlignment(Qt.AlignCenter)
 
-            edit_btn = QPushButton("Edit")
-            edit_btn.setFixedHeight(28)
-            edit_btn.setMinimumWidth(56)
-            edit_btn.setCursor(Qt.PointingHandCursor)
-            edit_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #FFFFFF;
-                    color: #0F172A;
-                    border: 1px solid #CBD5E1;
-                    border-radius: 4px;
-                    font-weight: 600;
-                    font-size: 12px;
-                    padding: 2px 8px;
-                }
-                QPushButton:hover {
-                    background-color: #F1F5F9;
-                    border-color: #94A3B8;
-                }
-            """)
-            edit_btn.clicked.connect(lambda checked, p=part: self.open_edit_dialog(p))
-            action_layout.addWidget(edit_btn)
-
-            stock_in_btn = QPushButton("+ Stock")
-            stock_in_btn.setFixedHeight(28)
-            stock_in_btn.setMinimumWidth(68)
-            stock_in_btn.setCursor(Qt.PointingHandCursor)
-            stock_in_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #FFFFFF;
-                    color: #15803D;
-                    border: 1px solid #86EFAC;
-                    border-radius: 4px;
-                    font-weight: 600;
-                    font-size: 12px;
-                    padding: 2px 8px;
-                }
-                QPushButton:hover {
-                    background-color: #F0FDF4;
-                    border-color: #4ADE80;
-                }
-            """)
-            stock_in_btn.clicked.connect(lambda checked, p=part: self.open_stock_in_dialog(p))
-            action_layout.addWidget(stock_in_btn)
-
-            adjust_btn = QPushButton("Adjust")
-            adjust_btn.setFixedHeight(28)
-            adjust_btn.setMinimumWidth(60)
-            adjust_btn.setCursor(Qt.PointingHandCursor)
-            adjust_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #FFFFFF;
-                    color: #475569;
-                    border: 1px solid #CBD5E1;
-                    border-radius: 4px;
-                    font-weight: 600;
-                    font-size: 12px;
-                    padding: 2px 8px;
-                }
-                QPushButton:hover {
-                    background-color: #F8FAFC;
-                    border-color: #94A3B8;
-                }
-            """)
-            adjust_btn.clicked.connect(lambda checked, p=part: self.open_adjust_dialog(p))
-            action_layout.addWidget(adjust_btn)
-
-            if self.current_user.is_admin():
-                del_btn = QPushButton("🗑 Delete")
-                del_btn.setFixedHeight(28)
-                del_btn.setMinimumWidth(76)
-                del_btn.setCursor(Qt.PointingHandCursor)
-                del_btn.setStyleSheet("""
+                edit_btn = QPushButton("Edit")
+                edit_btn.setFixedHeight(28)
+                edit_btn.setMinimumWidth(56)
+                edit_btn.setCursor(Qt.PointingHandCursor)
+                edit_btn.setStyleSheet("""
                     QPushButton {
                         background-color: #FFFFFF;
-                        color: #DC2626;
-                        border: 1px solid #FECACA;
+                        color: #0F172A;
+                        border: 1px solid #CBD5E1;
                         border-radius: 4px;
                         font-weight: 600;
                         font-size: 12px;
                         padding: 2px 8px;
                     }
                     QPushButton:hover {
-                        background-color: #FEF2F2;
-                        border-color: #F87171;
+                        background-color: #F1F5F9;
+                        border-color: #94A3B8;
                     }
                 """)
-                del_btn.clicked.connect(lambda checked, p=part: self.deactivate(p))
-                action_layout.addWidget(del_btn)
+                edit_btn.clicked.connect(lambda checked, p=part: self.open_edit_dialog(p))
+                action_layout.addWidget(edit_btn)
 
-            self.table.setCellWidget(row, 6, action_widget)
+                stock_in_btn = QPushButton("+ Stock")
+                stock_in_btn.setFixedHeight(28)
+                stock_in_btn.setMinimumWidth(68)
+                stock_in_btn.setCursor(Qt.PointingHandCursor)
+                stock_in_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #FFFFFF;
+                        color: #15803D;
+                        border: 1px solid #86EFAC;
+                        border-radius: 4px;
+                        font-weight: 600;
+                        font-size: 12px;
+                        padding: 2px 8px;
+                    }
+                    QPushButton:hover {
+                        background-color: #F0FDF4;
+                        border-color: #4ADE80;
+                    }
+                """)
+                stock_in_btn.clicked.connect(lambda checked, p=part: self.open_stock_in_dialog(p))
+                action_layout.addWidget(stock_in_btn)
+
+                adjust_btn = QPushButton("Adjust")
+                adjust_btn.setFixedHeight(28)
+                adjust_btn.setMinimumWidth(60)
+                adjust_btn.setCursor(Qt.PointingHandCursor)
+                adjust_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #FFFFFF;
+                        color: #475569;
+                        border: 1px solid #CBD5E1;
+                        border-radius: 4px;
+                        font-weight: 600;
+                        font-size: 12px;
+                        padding: 2px 8px;
+                    }
+                    QPushButton:hover {
+                        background-color: #F8FAFC;
+                        border-color: #94A3B8;
+                    }
+                """)
+                adjust_btn.clicked.connect(lambda checked, p=part: self.open_adjust_dialog(p))
+                action_layout.addWidget(adjust_btn)
+
+                if self.current_user.is_admin():
+                    del_btn = QPushButton("🗑 Delete")
+                    del_btn.setFixedHeight(28)
+                    del_btn.setMinimumWidth(76)
+                    del_btn.setCursor(Qt.PointingHandCursor)
+                    del_btn.setStyleSheet("""
+                        QPushButton {
+                            background-color: #FFFFFF;
+                            color: #DC2626;
+                            border: 1px solid #FECACA;
+                            border-radius: 4px;
+                            font-weight: 600;
+                            font-size: 12px;
+                            padding: 2px 8px;
+                        }
+                        QPushButton:hover {
+                            background-color: #FEF2F2;
+                            border-color: #F87171;
+                        }
+                    """)
+                    del_btn.clicked.connect(lambda checked, p=part: self.deactivate(p))
+                    action_layout.addWidget(del_btn)
+
+                self.table.setCellWidget(row, 6, action_widget)
+        finally:
+            self.table.setUpdatesEnabled(True)
 
     def prev_page(self):
         if self.current_page > 1:

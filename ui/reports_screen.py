@@ -21,7 +21,8 @@ from utils.reorder_export import generate_reorder_pdf
 from ui.sales_trend_chart import SalesTrendChart
 from ui.theme import (
     StockBadgeDelegate, COLOR_BORDER, COLOR_TEXT_PRIMARY,
-    COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE, COLOR_SUCCESS
+    COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE, COLOR_SUCCESS,
+    PlusMinusSpinBox
 )
 
 class ReportsScreen(QWidget):
@@ -84,9 +85,7 @@ class ReportsScreen(QWidget):
             self.month_combo.addItem(m, i)
         self.month_combo.setCurrentIndex(date.today().month - 1)
 
-        self.year_spin = QSpinBox()
-        self.year_spin.setRange(2020, 2100)
-        self.year_spin.setValue(date.today().year)
+        self.year_spin = PlusMinusSpinBox(2020, 2100, date.today().year)
         controls.addWidget(self.month_combo)
         controls.addWidget(self.year_spin)
 
@@ -292,9 +291,7 @@ class ReportsScreen(QWidget):
 
         top_bar = QHBoxLayout()
         top_bar.addWidget(QLabel("Top"))
-        self.top_limit = QSpinBox()
-        self.top_limit.setRange(5, 50)
-        self.top_limit.setValue(10)
+        self.top_limit = PlusMinusSpinBox(5, 50, 10)
         top_bar.addWidget(self.top_limit)
         top_bar.addWidget(QLabel("best-selling parts"))
         refresh_btn = QPushButton("Refresh")

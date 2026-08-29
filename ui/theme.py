@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QLineEdit, QComboBox, QStyledItemDelegate
 )
-from PySide6.QtCore import Qt, QRect, QRectF
+from PySide6.QtCore import Qt, QRect, QRectF, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QBrush, QPen
 
 # --- Color Palette Tokens ---
@@ -81,14 +81,14 @@ QLineEdit:disabled {{
     border: 1px solid #E2E8F0;
 }}
 
-/* SpinBox & DateEdit with clean, clear up/down arrow buttons */
+/* SpinBox & DateEdit with explicit, high-contrast Up (▲) / Down (▼) arrow buttons */
 QSpinBox, QDoubleSpinBox, QDateEdit {{
     background-color: #FFFFFF;
     color: {COLOR_TEXT_PRIMARY};
     border: 1px solid {COLOR_BORDER};
     border-radius: 6px;
     padding: 4px 28px 4px 8px;
-    min-height: 24px;
+    min-height: 26px;
     font-size: 13px;
 }}
 
@@ -96,47 +96,55 @@ QSpinBox:focus, QDoubleSpinBox:focus, QDateEdit:focus {{
     border: 1px solid {COLOR_PRIMARY_ORANGE};
 }}
 
-QSpinBox::up-button, QDoubleSpinBox::up-button {{
+QSpinBox::up-button, QDoubleSpinBox::up-button, QDateEdit::up-button {{
     subcontrol-origin: border;
     subcontrol-position: top right;
-    width: 22px;
+    width: 24px;
     height: 14px;
     border-left: 1px solid #CBD5E1;
     border-bottom: 1px solid #E2E8F0;
     border-top-right-radius: 5px;
-    background-color: #F1F5F9;
+    background-color: #F8FAFC;
 }}
 
-QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {{
-    background-color: #E2E8F0;
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover, QDateEdit::up-button:hover {{
+    background-color: #FFF7ED;
+    border-color: #F97316;
 }}
 
-QSpinBox::down-button, QDoubleSpinBox::down-button {{
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow, QDateEdit::up-arrow {{
+    image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><polygon points='5,0 10,6 0,6' fill='%230F172A'/></svg>");
+    width: 10px;
+    height: 6px;
+}}
+
+QSpinBox::up-button:hover QSpinBox::up-arrow, QDoubleSpinBox::up-button:hover QDoubleSpinBox::up-arrow, QDateEdit::up-button:hover QDateEdit::up-arrow {{
+    image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><polygon points='5,0 10,6 0,6' fill='%23F97316'/></svg>");
+}}
+
+QSpinBox::down-button, QDoubleSpinBox::down-button, QDateEdit::down-button {{
     subcontrol-origin: border;
     subcontrol-position: bottom right;
-    width: 22px;
+    width: 24px;
     height: 14px;
     border-left: 1px solid #CBD5E1;
     border-bottom-right-radius: 5px;
-    background-color: #F1F5F9;
+    background-color: #F8FAFC;
 }}
 
-QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
-    background-color: #E2E8F0;
+QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover, QDateEdit::down-button:hover {{
+    background-color: #FFF7ED;
+    border-color: #F97316;
 }}
 
-QDateEdit::drop-down {{
-    subcontrol-origin: border;
-    subcontrol-position: top right;
-    width: 24px;
-    border-left: 1px solid #CBD5E1;
-    background-color: #F1F5F9;
-    border-top-right-radius: 5px;
-    border-bottom-right-radius: 5px;
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow, QDateEdit::down-arrow {{
+    image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><polygon points='0,0 10,0 5,6' fill='%230F172A'/></svg>");
+    width: 10px;
+    height: 6px;
 }}
 
-QDateEdit::drop-down:hover {{
-    background-color: #E2E8F0;
+QSpinBox::down-button:hover QSpinBox::down-arrow, QDoubleSpinBox::down-button:hover QSpinBox::down-arrow, QDateEdit::down-button:hover QDateEdit::down-arrow {{
+    image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><polygon points='0,0 10,0 5,6' fill='%23F97316'/></svg>");
 }}
 
 /* Combo Box */
@@ -558,3 +566,134 @@ class QuantityStepper(QWidget):
             self.qty_label.setText(str(self._value))
             if self._callback:
                 self._callback(self._value)
+
+
+class PlusMinusSpinBox(QWidget):
+    """
+    A clean, bulletproof spinbox control with explicit '+' (top) and '−' (bottom) buttons.
+    Replaces fragile OS QSpinBox arrow subcontrols with unmistakable plus and minus push buttons.
+    """
+    valueChanged = Signal(int)
+
+    def __init__(self, min_val: int = 1, max_val: int = 100000, value: int = 10, parent=None):
+        super().__init__(parent)
+        self._min = min_val
+        self._max = max_val
+        self._value = value
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # Line edit input
+        self.input = QLineEdit(str(self._value))
+        self.input.setFixedWidth(54)
+        self.input.setFixedHeight(30)
+        self.input.setAlignment(Qt.AlignCenter)
+        self.input.setStyleSheet("""
+            QLineEdit {
+                background-color: #FFFFFF;
+                color: #0F172A;
+                font-weight: 700;
+                font-size: 13px;
+                border: 1px solid #CBD5E1;
+                border-top-left-radius: 6px;
+                border-bottom-left-radius: 6px;
+                border-right: none;
+            }
+        """)
+        self.input.textChanged.connect(self._on_text_edited)
+        layout.addWidget(self.input)
+
+        # Stacked top (+) and bottom (-) buttons
+        btn_box = QWidget()
+        btn_layout = QVBoxLayout(btn_box)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(0)
+
+        self.plus_btn = QPushButton("+")
+        self.plus_btn.setFixedSize(24, 15)
+        self.plus_btn.setCursor(Qt.PointingHandCursor)
+        self.plus_btn.setToolTip("Increase (+)")
+        self.plus_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #F8FAFC;
+                color: #0F172A;
+                font-weight: 900;
+                font-size: 11px;
+                border: 1px solid #CBD5E1;
+                border-top-right-radius: 6px;
+                padding: 0px;
+                line-height: 11px;
+            }
+            QPushButton:hover {
+                background-color: #FFF7ED;
+                color: #F97316;
+                border-color: #F97316;
+            }
+            QPushButton:pressed {
+                background-color: #FED7AA;
+            }
+        """)
+        self.plus_btn.clicked.connect(self.increment)
+        btn_layout.addWidget(self.plus_btn)
+
+        self.minus_btn = QPushButton("−")
+        self.minus_btn.setFixedSize(24, 15)
+        self.minus_btn.setCursor(Qt.PointingHandCursor)
+        self.minus_btn.setToolTip("Decrease (-)")
+        self.minus_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #F8FAFC;
+                color: #0F172A;
+                font-weight: 900;
+                font-size: 11px;
+                border: 1px solid #CBD5E1;
+                border-top: none;
+                border-bottom-right-radius: 6px;
+                padding: 0px;
+                line-height: 11px;
+            }
+            QPushButton:hover {
+                background-color: #FFF7ED;
+                color: #F97316;
+                border-color: #F97316;
+            }
+            QPushButton:pressed {
+                background-color: #FED7AA;
+            }
+        """)
+        self.minus_btn.clicked.connect(self.decrement)
+        btn_layout.addWidget(self.minus_btn)
+
+        layout.addWidget(btn_box)
+
+    def value(self) -> int:
+        return self._value
+
+    def setValue(self, val: int):
+        val = max(self._min, min(self._max, val))
+        self._value = val
+        self.input.blockSignals(True)
+        self.input.setText(str(val))
+        self.input.blockSignals(False)
+
+    def setRange(self, min_val: int, max_val: int):
+        self._min = min_val
+        self._max = max_val
+
+    def increment(self):
+        self.setValue(self._value + 1)
+        self.valueChanged.emit(self._value)
+
+    def decrement(self):
+        self.setValue(self._value - 1)
+        self.valueChanged.emit(self._value)
+
+    def _on_text_edited(self, text):
+        try:
+            val = int(text.strip())
+            self._value = max(self._min, min(self._max, val))
+            self.valueChanged.emit(self._value)
+        except ValueError:
+            pass

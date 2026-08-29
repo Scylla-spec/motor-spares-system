@@ -26,23 +26,24 @@ from models.part import Part
 # ---------------------------------------------------------------------------
 COLUMN_ALIASES = {
     "part_number":         ["part number", "part no", "part no.", "partno", "part_no",
-                             "code", "item code", "sku", "stock code", "part#"],
+                             "code", "item code", "sku", "stock code", "part#", "partcode", "itemcode"],
     "name":                ["name", "description", "part name", "item name", "item description",
                              "product name", "part description",
-                             "stocks", "stock", "stock name", "item"],
-    "category":            ["category", "cat", "type", "group", "product type"],
+                             "stocks", "stock", "stock name", "item", "desc", "stock description"],
+    "category":            ["category", "cat", "type", "group", "product type", "dept", "department"],
     "brand":               ["brand", "manufacturer", "make", "mfr", "mfg"],
     "compatible_vehicles": ["compatible vehicles", "vehicles", "fits", "vehicle",
                              "compatibility", "application", "for vehicle"],
     "cost_price":          ["cost price", "cost", "buy price", "purchase price", "unit cost",
-                             "buying price", "net price"],
+                             "buying price", "net price", "cost_price"],
     "selling_price":       ["selling price", "sell price", "sale price", "retail price",
-                             "price", "unit price", "rrp"],
+                             "price", "unit price", "rrp", "selling_price"],
     "quantity_on_hand":    ["quantity", "qty", "quantity on hand", "on hand",
                              "stock qty", "stock quantity", "units",
-                             "stock available", "available", "available stock", "balance"],
+                             "stock available", "available", "available stock", "balance",
+                             "onhand", "on_hand"],
     "reorder_level":       ["reorder level", "reorder", "min stock", "minimum stock",
-                             "reorder point", "min qty"],
+                             "reorder point", "min qty", "reorder_level"],
     "supplier":            ["supplier", "vendor", "supplier name"],
 }
 
@@ -62,22 +63,151 @@ def _normalise(text: str) -> str:
     """Lowercase, strip whitespace for comparison."""
     return str(text).lower().strip()
 
-def _map_headers(headers: List[str]) -> Dict[str, int]:
+
+def _normalize_row_cells(row: tuple) -> List[str]:
     """
-    Maps raw spreadsheet headers to canonical field names.
-    Returns {canonical_field: column_index}.
-    No fields are required — any that match are used, the rest are
-    left for the user to fill in during review.
+    Normalizes a tuple of cell values.
+    If a cell contains tab characters (\t), splits them so tab-separated cell
+    contents are properly separated into columns.
+    Returns a list of raw string values (or empty strings for None).
+    """
+    result = []
+    for cell in row:
+        if cell is None:
+            result.append("")
+        else:
+            val_str = str(cell)
+            if "\t" in val_str:
+                parts = val_str.split("\t")
+                result.extend([p.strip() for p in parts])
+            else:
+                result.append(val_str.strip())
+    return result
+
+
+def _score_header_row(cells: List[str]) -> Tuple[Dict[str, int], int]:
+    """
+    Evaluates a list of header cell strings.
+    Returns (col_map, score) where score is the number of distinct canonical fields matched.
     """
     mapping = {}
-    normalised_headers = [_normalise(h) for h in headers]
-    
+    normalised = [_normalise(c) for c in cells]
     for field, aliases in COLUMN_ALIASES.items():
-        for idx, header in enumerate(normalised_headers):
-            if header in aliases:
+        for idx, h in enumerate(normalised):
+            if h in aliases and field not in mapping:
                 mapping[field] = idx
                 break
-    return mapping
+    return mapping, len(mapping)
+
+
+def parse_excel_file(filepath: str) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """
+    Parses an Excel file and returns:
+    - list of raw row dicts with canonical field names
+    - list of informational warnings (never hard errors here)
+
+    Automatically scans worksheets and header candidate rows to pick the best-matching
+    header layout. Supports tab-delimited strings within cells and sparse tables.
+    """
+    wb = openpyxl.load_workbook(filepath, data_only=True)
+    if not wb.sheetnames:
+        return [], ["The spreadsheet appears to be empty."]
+
+    best_rows = []
+    best_col_map = {}
+    best_header_row_idx = -1
+    best_max_score = 0
+
+    warnings = []
+
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        raw_rows = list(ws.iter_rows(values_only=True))
+        if not raw_rows:
+            continue
+
+        sheet_best_score = 0
+        sheet_best_map = {}
+        sheet_best_row_idx = -1
+
+        non_empty_count = 0
+        for i, raw_row in enumerate(raw_rows):
+            if all(cell is None for cell in raw_row):
+                continue
+            non_empty_count += 1
+            if non_empty_count > 25:
+                break
+
+            cells = _normalize_row_cells(raw_row)
+            col_map, score = _score_header_row(cells)
+            if score > sheet_best_score:
+                sheet_best_score = score
+                sheet_best_map = col_map
+                sheet_best_row_idx = i
+
+        if sheet_best_score > best_max_score:
+            best_max_score = sheet_best_score
+            best_col_map = sheet_best_map
+            best_header_row_idx = sheet_best_row_idx
+            best_rows = raw_rows
+
+    if not best_rows:
+        return [], ["The spreadsheet appears to be empty."]
+
+    # If no headers matched across any sheet, fall back to active worksheet
+    if best_max_score == 0:
+        ws = wb.active
+        best_rows = list(ws.iter_rows(values_only=True))
+        best_header_row_idx = 0
+        for i, row in enumerate(best_rows):
+            if any(cell is not None for cell in row):
+                best_header_row_idx = i
+                break
+
+    if best_max_score > 0:
+        undetected = [f for f in ("part_number", "name") if f not in best_col_map]
+        if undetected:
+            readable = {"part_number": "Part Number", "name": "Name"}
+            names = " and ".join(readable[f] for f in undetected)
+            warnings.append(
+                f"[INFO] {names} column(s) were not detected — auto-generated placeholders "
+                f"will be used. Please fill in the correct values in the review table."
+            )
+    else:
+        warnings.append(
+            "[INFO] No column headers were recognised. Treating the data as a single "
+            "column and placing everything in 'Name'. Please correct the values "
+            "in the review table before importing."
+        )
+
+    parsed_rows = []
+    if best_max_score == 0:
+        for row in best_rows[best_header_row_idx + 1:]:
+            if all(cell is None for cell in row):
+                continue
+            cells = _normalize_row_cells(row)
+            non_empty = [c for c in cells if c]
+            if non_empty:
+                record = {"name": " | ".join(non_empty)}
+                parsed_rows.append(record)
+        return parsed_rows, warnings
+
+    for row in best_rows[best_header_row_idx + 1:]:
+        if all(cell is None for cell in row):
+            continue
+        cells = _normalize_row_cells(row)
+        if not any(cells):
+            continue
+
+        record = {}
+        for field, col_idx in best_col_map.items():
+            record[field] = cells[col_idx] if col_idx < len(cells) and cells[col_idx] != "" else None
+
+        if any(v is not None for v in record.values()):
+            parsed_rows.append(record)
+
+    return parsed_rows, warnings
+
 
 def _clean_numeric(value: Any) -> float:
     """Strip currency symbols and commas, return float."""
@@ -89,9 +219,11 @@ def _clean_numeric(value: Any) -> float:
     except ValueError:
         return 0.0
 
+
 def _clean_int(value: Any) -> int:
     """Clean and return integer."""
     return int(_clean_numeric(value))
+
 
 def _fuzzy_correct(value: str, choices: List[str], threshold: int = 80) -> Tuple[str, bool]:
     """
@@ -109,76 +241,6 @@ def _fuzzy_correct(value: str, choices: List[str], threshold: int = 80) -> Tuple
         return corrected, (corrected != value_norm)
     return value_norm, False
 
-def parse_excel_file(filepath: str) -> Tuple[List[Dict[str, Any]], List[str]]:
-    """
-    Parses an Excel file and returns:
-    - list of raw row dicts with canonical field names
-    - list of informational warnings (never hard errors here)
-
-    No columns are required. If no recognised columns are found the
-    raw cell values are still surfaced so the user can map them manually
-    in the review table.
-    """
-    wb = openpyxl.load_workbook(filepath, data_only=True)
-    ws = wb.active
-    
-    rows = list(ws.iter_rows(values_only=True))
-    if not rows:
-        return [], ["The spreadsheet appears to be empty."]
-    
-    # Find header row — first non-empty row
-    header_row_idx = 0
-    for i, row in enumerate(rows):
-        if any(cell is not None for cell in row):
-            header_row_idx = i
-            break
-    
-    headers = [str(h) if h is not None else "" for h in rows[header_row_idx]]
-    col_map = _map_headers(headers)
-    
-    warnings = []
-    # Informational only — tell the user which columns weren't auto-detected
-    # so they know what to expect in the review table, but never block import.
-    undetected = [f for f in ("part_number", "name") if f not in col_map]
-    if undetected:
-        readable = {"part_number": "Part Number", "name": "Name"}
-        names = " and ".join(readable[f] for f in undetected)
-        warnings.append(
-            f"[INFO] {names} column(s) were not detected — auto-generated placeholders "
-            f"will be used. Please fill in the correct values in the review table."
-        )
-
-    # If NO columns were recognised at all, fall back to positional import:
-    # treat the first column as 'name' so the user at least sees the data.
-    if not col_map:
-        warnings.append(
-            "[INFO] No column headers were recognised. Treating the data as a single "
-            "column and placing everything in 'Name'. Please correct the values "
-            "in the review table before importing."
-        )
-        parsed_rows = []
-        for row in rows[header_row_idx + 1:]:
-            if all(cell is None for cell in row):
-                continue
-            # Build a record from whatever non-None cells exist left-to-right
-            non_empty = [str(c) for c in row if c is not None]
-            if non_empty:
-                record = {"name": " | ".join(non_empty)}
-                parsed_rows.append(record)
-        return parsed_rows, warnings
-    
-    parsed_rows = []
-    for row in rows[header_row_idx + 1:]:
-        if all(cell is None for cell in row):
-            continue  # skip entirely blank rows
-        
-        record = {}
-        for field, col_idx in col_map.items():
-            record[field] = row[col_idx] if col_idx < len(row) else None
-            
-        parsed_rows.append(record)
-    
-    return parsed_rows, warnings
 
 def auto_correct_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -230,7 +292,7 @@ def auto_correct_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             )
         clean["name"] = name
 
-        # --- Category: fuzzy correct ---
+        # --- Category: fuzzy correct or infer ---
         raw_cat = str(clean.get("category", "") or "").strip().upper()
         if raw_cat:
             fixed_cat, was_fixed = _fuzzy_correct(raw_cat, existing_categories)
@@ -238,7 +300,8 @@ def auto_correct_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 corrections.append(f"Category: '{raw_cat}' → '{fixed_cat.upper()}'")
             clean["category"] = fixed_cat.upper()
         else:
-            clean["category"] = raw_cat
+            from utils.categorizer import infer_category
+            clean["category"] = infer_category(clean["name"], clean["part_number"])
 
         # --- Brand: fuzzy correct ---
         raw_brand = str(clean.get("brand", "") or "").strip().upper()
