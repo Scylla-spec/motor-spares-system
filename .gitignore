@@ -11,3 +11,7 @@ exports/
 receipts/
 reorder_exports/
 *.csv
+
+dist/
+build/
+*.spec.bak
