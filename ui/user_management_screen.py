@@ -63,10 +63,11 @@ class UserManagementScreen(QWidget):
         u_header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         u_header.setSectionResizeMode(3, QHeaderView.Stretch)
         u_header.setSectionResizeMode(4, QHeaderView.Fixed)
-        self.user_table.setColumnWidth(4, 90)
+        self.user_table.setColumnWidth(4, 110)
         self.user_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.user_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.user_table.verticalHeader().setVisible(False)
+        self.user_table.verticalHeader().setDefaultSectionSize(40)
         left_layout.addWidget(self.user_table)
 
         self.backup_btn = QPushButton("Back Up Database")
@@ -162,7 +163,7 @@ class UserManagementScreen(QWidget):
             del_layout.setAlignment(Qt.AlignCenter)
 
             del_btn = QPushButton("Delete")
-            del_btn.setFixedSize(70, 28)
+            del_btn.setFixedSize(88, 30)
             del_btn.setCursor(Qt.PointingHandCursor)
             del_btn.setStyleSheet("""
                 QPushButton {
