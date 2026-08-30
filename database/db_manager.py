@@ -127,7 +127,24 @@ def initialize_database():
                 status TEXT CHECK(status IN ('Draft', 'Ordered', 'Received')) NOT NULL,
                 order_date TEXT,
                 total_cost REAL,
+                po_number TEXT,
                 FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id) ON DELETE RESTRICT
+            );
+        """)
+
+        # 8b. PurchaseOrderItem Table (Line items for purchase orders)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS PurchaseOrderItem (
+                po_item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                po_id INTEGER NOT NULL,
+                part_id INTEGER NOT NULL,
+                part_number TEXT,
+                part_name TEXT,
+                quantity_ordered INTEGER NOT NULL CHECK(quantity_ordered > 0),
+                unit_cost REAL NOT NULL,
+                subtotal REAL NOT NULL,
+                FOREIGN KEY (po_id) REFERENCES PurchaseOrder(po_id) ON DELETE CASCADE,
+                FOREIGN KEY (part_id) REFERENCES Part(part_id) ON DELETE RESTRICT
             );
         """)
 
