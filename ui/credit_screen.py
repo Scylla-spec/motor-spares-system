@@ -96,16 +96,20 @@ class CreditOrderItemsDialog(QDialog):
 
 
 class RecordCreditSaleDialog(QDialog):
-    """Dialog to record a new credit sale with customer and item selection."""
+    """Dialog to record a new credit sale with customer selection and searchable item picker."""
     def __init__(self, cashier_id: int, parent=None):
         super().__init__(parent)
         self.cashier_id = cashier_id
         self._customers = get_all_customers()
-        self._parts = [p for p in get_all_parts() if not p.name.startswith("[DEACTIVATED]") and p.quantity_on_hand > 0]
+        self._all_in_stock_parts = [
+            p for p in get_all_parts()
+            if not p.name.startswith("[DEACTIVATED]") and p.quantity_on_hand > 0
+        ]
+        self._filtered_parts = list(self._all_in_stock_parts)
         self.selected_items = []  # list of dicts
 
         self.setWindowTitle("Record New Credit Sale (Pay Later)")
-        self.resize(650, 520)
+        self.resize(700, 560)
         self.setup_ui()
 
     def setup_ui(self):
@@ -149,56 +153,84 @@ class RecordCreditSaleDialog(QDialog):
             QFrame {{
                 background-color: #F8FAFC;
                 border: 1px solid {COLOR_BORDER};
-                border-radius: 6px;
-                padding: 8px;
+                border-radius: 8px;
+                padding: 10px;
             }}
         """)
         item_layout = QVBoxLayout(item_box)
-        item_layout.setSpacing(6)
+        item_layout.setSpacing(8)
 
-        item_header = QLabel("Add Items Taken on Credit:")
+        item_header_layout = QHBoxLayout()
+        item_header = QLabel("Search & Add Items Taken on Credit:")
         item_header.setStyleSheet(f"font-weight: 700; font-size: 12px; color: {COLOR_TEXT_PRIMARY};")
-        item_layout.addWidget(item_header)
+        item_header_layout.addWidget(item_header)
 
+        self.search_status_lbl = QLabel(f"{len(self._all_in_stock_parts)} in-stock parts available")
+        self.search_status_lbl.setStyleSheet(f"font-size: 11px; color: {COLOR_TEXT_SECONDARY};")
+        item_header_layout.addStretch()
+        item_header_layout.addWidget(self.search_status_lbl)
+        item_layout.addLayout(item_header_layout)
+
+        # Search Bar
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("🔍  Type part number (e.g. AC3032), name, vehicle, or brand to search...")
+        self.search_input.textChanged.connect(self._on_search_text_changed)
+        self.search_input.returnPressed.connect(self._on_search_return_pressed)
+        item_layout.addWidget(self.search_input)
+
+        # Dropdown selection + Quantity + Add button
         add_row = QHBoxLayout()
+        add_row.setSpacing(8)
+
         self.part_combo = QComboBox()
-        self.part_combo.setMinimumWidth(300)
-        for p in self._parts:
-            self.part_combo.addItem(f"{p.part_number} — {p.name} (Stock: {p.quantity_on_hand}, ${p.selling_price:.2f})", p.part_id)
-        add_row.addWidget(self.part_combo)
+        self.part_combo.setMinimumWidth(320)
+        self.part_combo.currentIndexChanged.connect(self._on_part_selection_changed)
+        add_row.addWidget(self.part_combo, 3)
 
         self.qty_spin = QSpinBox()
         self.qty_spin.setRange(1, 1000)
         self.qty_spin.setValue(1)
         self.qty_spin.setFixedWidth(70)
+        self.qty_spin.setToolTip("Quantity to take on credit")
         add_row.addWidget(self.qty_spin)
 
-        add_item_btn = QPushButton("+ Add to List")
-        add_item_btn.setStyleSheet(f"""
+        self.add_item_btn = QPushButton("+ Add to List")
+        self.add_item_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLOR_PRIMARY_ORANGE};
                 color: white;
                 font-weight: bold;
-                border-radius: 4px;
-                padding: 4px 12px;
+                border-radius: 5px;
+                padding: 6px 14px;
+            }}
+            QPushButton:hover {{
+                background-color: #EA580C;
+            }}
+            QPushButton:disabled {{
+                background-color: #CBD5E1;
+                color: #64748B;
             }}
         """)
-        add_item_btn.clicked.connect(self._add_item_to_table)
-        add_row.addWidget(add_item_btn)
+        self.add_item_btn.clicked.connect(self._add_item_to_table)
+        add_row.addWidget(self.add_item_btn)
         item_layout.addLayout(add_row)
 
         layout.addWidget(item_box)
 
+        # Populate initial parts list
+        self._populate_parts_combo()
+
         # Selected items table
         self.items_table = QTableWidget()
-        self.items_table.setColumnCount(5)
-        self.items_table.setHorizontalHeaderLabels(["Part#", "Name", "Qty", "Price", "Action"])
+        self.items_table.setColumnCount(6)
+        self.items_table.setHorizontalHeaderLabels(["Part#", "Part Name", "Qty", "Unit Price", "Subtotal", "Action"])
         header = self.items_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
         self.items_table.verticalHeader().setVisible(False)
         self.items_table.setEditTriggers(QTableWidget.NoEditTriggers)
         layout.addWidget(self.items_table)
@@ -240,6 +272,58 @@ class RecordCreditSaleDialog(QDialog):
 
         layout.addLayout(btn_layout)
 
+    def _populate_parts_combo(self):
+        self.part_combo.blockSignals(True)
+        self.part_combo.clear()
+        if not self._filtered_parts:
+            self.part_combo.addItem("-- No matching parts in stock --", None)
+            self.part_combo.setEnabled(False)
+            self.qty_spin.setEnabled(False)
+            self.add_item_btn.setEnabled(False)
+            self.search_status_lbl.setText("0 matches")
+        else:
+            self.part_combo.setEnabled(True)
+            self.qty_spin.setEnabled(True)
+            self.add_item_btn.setEnabled(True)
+            for p in self._filtered_parts:
+                self.part_combo.addItem(
+                    f"{p.part_number} — {p.name} (Stock: {p.quantity_on_hand}, ${p.selling_price:.2f})",
+                    p.part_id
+                )
+            count = len(self._filtered_parts)
+            self.search_status_lbl.setText(f"{count} item{'s' if count != 1 else ''} available")
+
+        self.part_combo.blockSignals(False)
+        self._on_part_selection_changed(self.part_combo.currentIndex())
+
+    def _on_search_text_changed(self, text: str):
+        query = text.strip().lower()
+        if not query:
+            self._filtered_parts = list(self._all_in_stock_parts)
+        else:
+            self._filtered_parts = [
+                p for p in self._all_in_stock_parts
+                if query in (p.part_number or "").lower()
+                or query in (p.name or "").lower()
+                or query in (p.brand or "").lower()
+                or query in (p.category or "").lower()
+                or query in (p.compatible_vehicles or "").lower()
+            ]
+        self._populate_parts_combo()
+
+    def _on_search_return_pressed(self):
+        # When hitting Enter in search bar, add selected item to list
+        if self.part_combo.isEnabled() and self.part_combo.currentData() is not None:
+            self._add_item_to_table()
+
+    def _on_part_selection_changed(self, index: int):
+        part_id = self.part_combo.currentData()
+        if not part_id:
+            return
+        part = next((p for p in self._all_in_stock_parts if p.part_id == part_id), None)
+        if part:
+            self.qty_spin.setMaximum(max(1, part.quantity_on_hand))
+
     def _on_customer_selected(self, index):
         cust_id = self.cust_combo.currentData()
         if cust_id:
@@ -255,7 +339,7 @@ class RecordCreditSaleDialog(QDialog):
             return
         qty = self.qty_spin.value()
 
-        part = next((p for p in self._parts if p.part_id == part_id), None)
+        part = next((p for p in self._all_in_stock_parts if p.part_id == part_id), None)
         if not part:
             return
 
@@ -280,23 +364,47 @@ class RecordCreditSaleDialog(QDialog):
             })
 
         self._refresh_items_table()
+        self.qty_spin.setValue(1)
+        self.search_input.selectAll()
+        self.search_input.setFocus()
 
     def _refresh_items_table(self):
         self.items_table.setRowCount(len(self.selected_items))
         total = 0.0
         for row, it in enumerate(self.selected_items):
-            self.items_table.setItem(row, 0, QTableWidgetItem(it["part_number"]))
+            subtotal = it["quantity"] * it["unit_price"]
+            pnum_item = QTableWidgetItem(it["part_number"])
+            font = QFont()
+            font.setBold(True)
+            pnum_item.setFont(font)
+            self.items_table.setItem(row, 0, pnum_item)
             self.items_table.setItem(row, 1, QTableWidgetItem(it["part_name"]))
             self.items_table.setItem(row, 2, QTableWidgetItem(str(it["quantity"])))
             self.items_table.setItem(row, 3, QTableWidgetItem(f"${it['unit_price']:.2f}"))
+            self.items_table.setItem(row, 4, QTableWidgetItem(f"${subtotal:.2f}"))
 
             remove_btn = QPushButton("Remove")
             remove_btn.setFixedHeight(24)
-            remove_btn.setStyleSheet("color: #EF4444; border: 1px solid #FECACA; border-radius: 3px; font-size: 11px;")
+            remove_btn.setCursor(Qt.PointingHandCursor)
+            remove_btn.setStyleSheet("""
+                QPushButton {
+                    color: #EF4444;
+                    background: #FEF2F2;
+                    border: 1px solid #FECACA;
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-weight: 600;
+                    padding: 2px 8px;
+                }
+                QPushButton:hover {
+                    background: #FEE2E2;
+                    border-color: #FCA5A5;
+                }
+            """)
             remove_btn.clicked.connect(lambda checked, idx=row: self._remove_item(idx))
-            self.items_table.setCellWidget(row, 4, remove_btn)
+            self.items_table.setCellWidget(row, 5, remove_btn)
 
-            total += it["quantity"] * it["unit_price"]
+            total += subtotal
 
         self.total_label.setText(f"Total: ${total:.2f}")
 
