@@ -30,7 +30,7 @@ from utils.validators import validate_part
 from ui.theme import (
     MetricStatCard, StockBadgeDelegate, create_primary_action_button,
     COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE,
-    PlusMinusSpinBox
+    PlusMinusSpinBox, ScreenHeader, ICON_INVENTORY
 )
 
 
@@ -382,22 +382,12 @@ class InventoryScreen(QWidget):
         header_layout.setSpacing(16)
 
         # Title & Subtitle
-        title_box = QVBoxLayout()
-        title_box.setSpacing(2)
-        title_label = QLabel("Inventory Management")
-        title_label.setStyleSheet(f"""
-            font-size: 22px;
-            font-weight: 800;
-            color: {COLOR_TEXT_PRIMARY};
-        """)
-        subtitle_label = QLabel("Manage and track your warehouse stock.")
-        subtitle_label.setStyleSheet(f"""
-            font-size: 13px;
-            color: {COLOR_TEXT_SECONDARY};
-        """)
-        title_box.addWidget(title_label)
-        title_box.addWidget(subtitle_label)
-        header_layout.addLayout(title_box)
+        title_box = ScreenHeader(
+            ICON_INVENTORY,
+            "Inventory Management",
+            "Manage and track your warehouse stock.",
+        )
+        header_layout.addWidget(title_box)
 
         header_layout.addStretch()
 

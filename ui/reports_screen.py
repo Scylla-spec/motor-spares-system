@@ -20,8 +20,9 @@ from models.wishlist_item import WishlistItem, PRIORITY_LEVELS
 from utils.reorder_export import generate_reorder_pdf
 from ui.sales_trend_chart import SalesTrendChart
 from ui.theme import (
-    StockBadgeDelegate, COLOR_BORDER, COLOR_TEXT_PRIMARY,
-    COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE, COLOR_SUCCESS,
+    MetricStatCard, StockBadgeDelegate,
+    COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
+    COLOR_PRIMARY_ORANGE, ScreenHeader, ICON_REPORTS, COLOR_SUCCESS,
     PlusMinusSpinBox
 )
 
@@ -36,15 +37,11 @@ class ReportsScreen(QWidget):
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(16)
 
-        header_box = QVBoxLayout()
-        header_box.setSpacing(2)
-        title = QLabel("Reports & Analytics")
-        title.setStyleSheet(f"font-size: 22px; font-weight: 800; color: {COLOR_TEXT_PRIMARY};")
-        subtitle = QLabel("Sales summaries, stock alerts, profit margins, and reorder planning.")
-        subtitle.setStyleSheet(f"font-size: 13px; color: {COLOR_TEXT_SECONDARY};")
-        header_box.addWidget(title)
-        header_box.addWidget(subtitle)
-        layout.addLayout(header_box)
+        layout.addWidget(ScreenHeader(
+            ICON_REPORTS,
+            "Reports & Analytics",
+            "Sales summaries, stock alerts, profit margins, and reorder planning.",
+        ))
 
         tabs = QTabWidget()
         tabs.addTab(self._build_sales_tab(), "Sales Summary")

@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QFrame, QTableWidget, QTableWidgetItem, QHeaderView,
     QApplication, QMessageBox
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QSize
 from datetime import date
 
 from models.user import User
@@ -26,10 +26,14 @@ from ui.reports_screen import ReportsScreen
 from ui.settings_screen import SettingsScreen
 from managers.reports_manager import get_daily_sales_summary, get_low_stock_parts
 from ui.theme import (
-    MetricStatCard, StockBadgeDelegate, create_orange_button,
+    MetricStatCard, StockBadgeDelegate, create_orange_button, ScreenHeader,
     COLOR_SIDEBAR_BG, COLOR_SIDEBAR_HOVER, COLOR_SIDEBAR_TEXT,
     COLOR_SIDEBAR_ACTIVE_BG, COLOR_SIDEBAR_ACTIVE_TEXT,
-    COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY
+    COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
+    make_sidebar_icon, _svg_to_pixmap,
+    ICON_DASHBOARD, ICON_INVENTORY, ICON_POS, ICON_CREDIT,
+    ICON_CUSTOMERS, ICON_SUPPLIERS, ICON_REPORTS, ICON_USER_MGMT,
+    ICON_SETTINGS, ICON_LOGOUT
 )
 
 
@@ -57,7 +61,10 @@ class ModernTopBar(QFrame):
         layout.addStretch()
 
         # Logout Button (only thing in top bar)
-        logout_btn = QPushButton("Logout")
+        logout_btn = QPushButton("  Logout")
+        icon = make_sidebar_icon(ICON_LOGOUT, 14)
+        logout_btn.setIcon(icon)
+        logout_btn.setIconSize(QSize(14, 14))
         logout_btn.setCursor(Qt.PointingHandCursor)
         logout_btn.setStyleSheet(f"""
             QPushButton {{
@@ -96,22 +103,12 @@ class DashboardScreen(QWidget):
         layout.setSpacing(16)
 
         # Welcome Header
-        header_layout = QVBoxLayout()
-        header_layout.setSpacing(2)
-        welcome_title = QLabel(f"Welcome, {self.current_user.username}")
-        welcome_title.setStyleSheet(f"""
-            font-size: 20px;
-            font-weight: 800;
-            color: {COLOR_TEXT_PRIMARY};
-        """)
-        subtitle = QLabel("Here is today's overview and critical stock summary.")
-        subtitle.setStyleSheet(f"""
-            font-size: 12px;
-            color: {COLOR_TEXT_SECONDARY};
-        """)
-        header_layout.addWidget(welcome_title)
-        header_layout.addWidget(subtitle)
-        layout.addLayout(header_layout)
+        layout.addWidget(ScreenHeader(
+            ICON_DASHBOARD,
+            f"Welcome, {self.current_user.username}",
+            "Here is today's overview and critical stock summary.",
+            font_size=20,
+        ))
 
         # Summary Metric Cards Row
         cards_layout = QHBoxLayout()
@@ -268,6 +265,7 @@ class DashboardWindow(QMainWindow):
             }}
         """)
         self.sidebar_list.currentRowChanged.connect(self.display_screen)
+        self.sidebar_list.setIconSize(QSize(18, 18))
         sidebar_layout.addWidget(self.sidebar_list)
 
         sidebar_layout.addStretch()
@@ -298,46 +296,48 @@ class DashboardWindow(QMainWindow):
     def setup_screens(self):
         # 0: Dashboard Overview
         self.dashboard_screen = DashboardScreen(self.current_user)
-        self.add_nav_item("Dashboard Overview", self.dashboard_screen)
+        self.add_nav_item("Dashboard Overview", self.dashboard_screen, ICON_DASHBOARD)
 
         # 1: Inventory
         self.inventory_screen = InventoryScreen(self.current_user)
-        self.add_nav_item("Inventory", self.inventory_screen)
+        self.add_nav_item("Inventory", self.inventory_screen, ICON_INVENTORY)
 
         # 2: Point of Sale
         self.pos_screen = POSScreen(self.current_user)
-        self.add_nav_item("Point of Sale", self.pos_screen)
+        self.add_nav_item("Point of Sale", self.pos_screen, ICON_POS)
 
         # 3: Pay Later / On Credit
         self.credit_screen = CreditScreen(self.current_user)
-        self.add_nav_item("Pay Later / On Credit", self.credit_screen)
+        self.add_nav_item("Pay Later / On Credit", self.credit_screen, ICON_CREDIT)
 
         # 4: Customers
         self.customers_screen = CustomersScreen(self.current_user)
-        self.add_nav_item("Customers", self.customers_screen)
+        self.add_nav_item("Customers", self.customers_screen, ICON_CUSTOMERS)
 
         # 5: Suppliers
         self.suppliers_screen = SuppliersScreen(self.current_user)
-        self.add_nav_item("Suppliers", self.suppliers_screen)
+        self.add_nav_item("Suppliers", self.suppliers_screen, ICON_SUPPLIERS)
 
         # 6: Reports
         self.reports_screen = ReportsScreen(self.current_user)
-        self.add_nav_item("Reports", self.reports_screen)
+        self.add_nav_item("Reports", self.reports_screen, ICON_REPORTS)
 
         # 7: User Management (Admin Only)
         if self.current_user.is_admin():
             self.user_mgmt_screen = UserManagementScreen()
-            self.add_nav_item("User Management", self.user_mgmt_screen)
+            self.add_nav_item("User Management", self.user_mgmt_screen, ICON_USER_MGMT)
 
         # 8: Settings Screen (Admin Only)
         if self.current_user.is_admin():
             self.settings_screen = SettingsScreen()
-            self.add_nav_item("Settings", self.settings_screen)
+            self.add_nav_item("Settings", self.settings_screen, ICON_SETTINGS)
 
         self.sidebar_list.setCurrentRow(0)
 
-    def add_nav_item(self, label_text, widget):
+    def add_nav_item(self, label_text: str, widget, icon_svg: str = None):
         item = QListWidgetItem(label_text)
+        if icon_svg:
+            item.setIcon(make_sidebar_icon(icon_svg))
         self.sidebar_list.addItem(item)
         self.content_area.addWidget(widget)
 

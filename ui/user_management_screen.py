@@ -9,7 +9,8 @@ from managers.auth_manager import get_all_users, create_user, delete_user
 from managers.backup_manager import backup_database
 from utils.validators import validate_new_user
 from ui.theme import (
-    COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE
+    COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
+    COLOR_PRIMARY_ORANGE, ScreenHeader, ICON_USER_MGMT
 )
 
 
@@ -24,15 +25,11 @@ class UserManagementScreen(QWidget):
         outer.setContentsMargins(24, 20, 24, 20)
         outer.setSpacing(16)
 
-        header_box = QVBoxLayout()
-        header_box.setSpacing(2)
-        title = QLabel("User Management")
-        title.setStyleSheet(f"font-size: 22px; font-weight: 800; color: {COLOR_TEXT_PRIMARY};")
-        subtitle = QLabel("Manage system users, roles, and database backups.")
-        subtitle.setStyleSheet(f"font-size: 13px; color: {COLOR_TEXT_SECONDARY};")
-        header_box.addWidget(title)
-        header_box.addWidget(subtitle)
-        outer.addLayout(header_box)
+        outer.addWidget(ScreenHeader(
+            ICON_USER_MGMT,
+            "User Management",
+            "Manage system users, roles, and database backups.",
+        ))
 
         layout = QHBoxLayout()
         layout.setSpacing(16)

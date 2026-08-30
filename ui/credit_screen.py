@@ -22,8 +22,9 @@ from managers.credit_manager import (
 from managers.customer_manager import get_all_customers
 from managers.inventory_manager import get_all_parts
 from ui.theme import (
-    MetricStatCard, COLOR_BORDER, COLOR_TEXT_PRIMARY,
-    COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE, COLOR_SUCCESS
+    MetricStatCard, create_orange_button, StockBadgeDelegate,
+    COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
+    COLOR_PRIMARY_ORANGE, ScreenHeader, ICON_CREDIT, COLOR_SUCCESS
 )
 
 
@@ -353,15 +354,13 @@ class CreditScreen(QWidget):
 
         # Header
         header_layout = QHBoxLayout()
-        header_box = QVBoxLayout()
-        header_box.setSpacing(2)
-        title = QLabel("Pay Later / On Credit")
-        title.setStyleSheet(f"font-size: 20px; font-weight: 800; color: {COLOR_TEXT_PRIMARY};")
-        subtitle = QLabel("Track goods taken on customer credit, outstanding debts, and settlements.")
-        subtitle.setStyleSheet(f"font-size: 12px; color: {COLOR_TEXT_SECONDARY};")
-        header_box.addWidget(title)
-        header_box.addWidget(subtitle)
-        header_layout.addLayout(header_box)
+        header_box = ScreenHeader(
+            ICON_CREDIT,
+            "Pay Later / On Credit",
+            "Track goods taken on customer credit, outstanding debts, and settlements.",
+            font_size=20,
+        )
+        header_layout.addWidget(header_box)
 
         header_layout.addStretch()
 

@@ -14,7 +14,8 @@ from models.customer import Customer
 from managers.customer_manager import add_customer, update_customer, get_all_customers, get_customer_purchase_history, delete_customer
 from utils.validators import validate_required_name
 from ui.theme import (
-    COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE
+    COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
+    COLOR_PRIMARY_ORANGE, ScreenHeader, ICON_CUSTOMERS
 )
 
 
@@ -159,15 +160,12 @@ class CustomersScreen(QWidget):
 
         # Header
         top_bar = QHBoxLayout()
-        title_box = QVBoxLayout()
-        title_box.setSpacing(2)
-        title = QLabel("Customer Management")
-        title.setStyleSheet(f"font-size: 22px; font-weight: 800; color: {COLOR_TEXT_PRIMARY};")
-        subtitle = QLabel("Manage customer records, credit balances, and purchase logs.")
-        subtitle.setStyleSheet(f"font-size: 13px; color: {COLOR_TEXT_SECONDARY};")
-        title_box.addWidget(title)
-        title_box.addWidget(subtitle)
-        top_bar.addLayout(title_box)
+        title_box = ScreenHeader(
+            ICON_CUSTOMERS,
+            "Customer Management",
+            "Manage customer records, credit balances, and purchase logs.",
+        )
+        top_bar.addWidget(title_box)
 
         top_bar.addStretch()
 

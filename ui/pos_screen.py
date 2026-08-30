@@ -23,8 +23,9 @@ from managers.sales_manager import process_sale
 from managers.customer_manager import get_all_customers
 from managers.credit_manager import create_credit_order
 from ui.theme import (
-    StockBadgeDelegate, QuantityStepper, COLOR_BORDER, COLOR_TEXT_PRIMARY,
-    COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE
+    MetricStatCard, StockBadgeDelegate, create_primary_action_button,
+    create_orange_button, COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
+    COLOR_PRIMARY_ORANGE, PlusMinusSpinBox, ScreenHeader, ICON_POS
 )
 
 
@@ -44,15 +45,12 @@ class POSScreen(QWidget):
         main_layout.setSpacing(12)
 
         # Header
-        header_box = QVBoxLayout()
-        header_box.setSpacing(2)
-        title = QLabel("Point of Sale")
-        title.setStyleSheet(f"font-size: 20px; font-weight: 800; color: {COLOR_TEXT_PRIMARY};")
-        subtitle = QLabel("Search parts, build active orders, and process customer checkout.")
-        subtitle.setStyleSheet(f"font-size: 12px; color: {COLOR_TEXT_SECONDARY};")
-        header_box.addWidget(title)
-        header_box.addWidget(subtitle)
-        main_layout.addLayout(header_box)
+        main_layout.addWidget(ScreenHeader(
+            ICON_POS,
+            "Point of Sale",
+            "Search parts, build active orders, and process customer checkout.",
+            font_size=20,
+        ))
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.setStyleSheet("QSplitter::handle { background-color: #E2E8F0; width: 2px; }")

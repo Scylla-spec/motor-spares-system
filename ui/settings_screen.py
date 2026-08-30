@@ -6,7 +6,8 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt
 from managers.settings_manager import get_all_settings, update_settings
 from ui.theme import (
-    COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE
+    COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE,
+    ScreenHeader, ICON_SETTINGS
 )
 
 
@@ -27,19 +28,12 @@ class SettingsScreen(QWidget):
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(16)
 
-        header_box = QVBoxLayout()
-        header_box.setSpacing(2)
-        title = QLabel("Shop Settings")
-        title.setStyleSheet(f"font-size: 22px; font-weight: 800; color: {COLOR_TEXT_PRIMARY};")
-        subtitle = QLabel(
+        layout.addWidget(ScreenHeader(
+            ICON_SETTINGS,
+            "Shop Settings",
             "These values appear on printed receipts and, over time, "
-            "elsewhere in the app. Changes take effect on the next receipt printed."
-        )
-        subtitle.setStyleSheet(f"font-size: 13px; color: {COLOR_TEXT_SECONDARY};")
-        subtitle.setWordWrap(True)
-        header_box.addWidget(title)
-        header_box.addWidget(subtitle)
-        layout.addLayout(header_box)
+            "elsewhere in the app. Changes take effect on the next receipt printed.",
+        ))
 
         group = QFrame()
         group.setStyleSheet(f"""

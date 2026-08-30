@@ -16,8 +16,9 @@ from managers.supplier_manager import add_supplier, update_supplier, get_all_sup
 from managers.purchase_order_manager import create_po, update_po_status, get_all_pos
 from utils.validators import validate_required_name
 from ui.theme import (
+    MetricStatCard, create_orange_button, StockBadgeDelegate,
     COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
-    COLOR_PRIMARY_ORANGE, COLOR_SUCCESS, COLOR_WARNING
+    COLOR_PRIMARY_ORANGE, COLOR_SUCCESS, ScreenHeader, ICON_SUPPLIERS, COLOR_WARNING
 )
 
 
@@ -188,15 +189,11 @@ class SuppliersScreen(QWidget):
         main_layout.setSpacing(14)
 
         # Header
-        header_box = QVBoxLayout()
-        header_box.setSpacing(2)
-        title = QLabel("Suppliers & Purchase Orders")
-        title.setStyleSheet(f"font-size: 22px; font-weight: 800; color: {COLOR_TEXT_PRIMARY};")
-        subtitle = QLabel("Manage supplier relationships and track replenishment purchase orders.")
-        subtitle.setStyleSheet(f"font-size: 13px; color: {COLOR_TEXT_SECONDARY};")
-        header_box.addWidget(title)
-        header_box.addWidget(subtitle)
-        main_layout.addLayout(header_box)
+        main_layout.addWidget(ScreenHeader(
+            ICON_SUPPLIERS,
+            "Suppliers & Purchase Orders",
+            "Manage supplier relationships and track replenishment purchase orders.",
+        ))
 
         splitter = QSplitter(Qt.Vertical)
         splitter.setStyleSheet("QSplitter::handle { background-color: #E2E8F0; height: 2px; }")
