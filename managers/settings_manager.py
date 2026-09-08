@@ -15,6 +15,9 @@ DEFAULTS = {
     "thermal_paper_width": "80",
     "thermal_auto_print": "1",
     "thermal_cut_paper": "1",
+    "rate_zig": "26.50",
+    "rate_zar": "18.20",
+    "phone_country_code": "+263",
 }
 
 

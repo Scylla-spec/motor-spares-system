@@ -310,3 +310,186 @@ def get_profit_margin_report() -> List[Dict[str, Any]]:
         return []
     finally:
         conn.close()
+
+
+# --- Retail Health & Root-Cause Diagnostic Matrix (NuClass-Inspired) ---
+
+def get_dead_capital_matrix(days_threshold: int = 90) -> Dict[str, Any]:
+    """
+    Identifies parts where capital is frozen (stock on hand > 0 with no sales
+    recorded in the last `days_threshold` days).
+    Returns category breakdown, total tied-up capital, and individual stagnant items.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT p.part_id, p.part_number, p.name, p.category, p.brand,
+                   p.quantity_on_hand, p.cost_price, p.selling_price,
+                   (p.quantity_on_hand * p.cost_price) as tied_up_cost,
+                   MAX(s.timestamp) as last_sold_date
+            FROM Part p
+            LEFT JOIN SaleItem si ON p.part_id = si.part_id
+            LEFT JOIN Sale s ON si.sale_id = s.sale_id
+            WHERE p.quantity_on_hand > 0
+              AND p.name NOT LIKE '[DEACTIVATED]%'
+            GROUP BY p.part_id
+            HAVING last_sold_date IS NULL
+                OR julianday('now') - julianday(last_sold_date) >= ?
+            ORDER BY tied_up_cost DESC
+        """, (days_threshold,))
+
+        rows = cursor.fetchall()
+        stagnant_parts = []
+        category_summary = {}
+        total_frozen_capital = 0.0
+
+        for r in rows:
+            tied_cost = float(r["tied_up_cost"] or 0.0)
+            total_frozen_capital += tied_cost
+            cat = r["category"] or "Uncategorized"
+
+            if cat not in category_summary:
+                category_summary[cat] = {
+                    "category": cat,
+                    "part_count": 0,
+                    "total_units": 0,
+                    "tied_up_capital": 0.0
+                }
+            category_summary[cat]["part_count"] += 1
+            category_summary[cat]["total_units"] += r["quantity_on_hand"]
+            category_summary[cat]["tied_up_capital"] += tied_cost
+
+            stagnant_parts.append({
+                "part_id": r["part_id"],
+                "part_number": r["part_number"],
+                "name": r["name"],
+                "category": cat,
+                "brand": r["brand"],
+                "quantity": r["quantity_on_hand"],
+                "cost_price": r["cost_price"],
+                "tied_up_cost": tied_cost,
+                "last_sold": (r["last_sold_date"][:10] if r["last_sold_date"] else "Never Sold")
+            })
+
+        return {
+            "total_frozen_capital": total_frozen_capital,
+            "stagnant_part_count": len(stagnant_parts),
+            "category_breakdown": sorted(category_summary.values(), key=lambda x: x["tied_up_capital"], reverse=True),
+            "stagnant_parts": stagnant_parts[:50]
+        }
+    except sqlite3.Error as e:
+        logging.error(f"Error in get_dead_capital_matrix: {e}")
+        return {"total_frozen_capital": 0.0, "stagnant_part_count": 0, "category_breakdown": [], "stagnant_parts": []}
+    finally:
+        conn.close()
+
+
+def get_credit_risk_matrix() -> Dict[str, Any]:
+    """
+    Categorizes all pending credit debt into aging default risk bands:
+    - 0 to 30 days: Low Risk (Current)
+    - 31 to 60 days: Medium Risk (Overdue Watchlist)
+    - 61 to 90 days: High Risk (Significant Default Hazard)
+    - > 90 days: Critical (Default Danger / Bad Debt)
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT co.credit_id, co.customer_name, co.customer_phone,
+                   co.total_amount, co.created_at, co.due_date,
+                   CAST(julianday('now') - julianday(co.created_at) AS INT) as days_open
+            FROM CreditOrder co
+            WHERE co.status = 'Pending'
+            ORDER BY days_open DESC
+        """)
+
+        bands = {
+            "CURRENT": {"label": "Current (0–30 Days)", "color": "#16A34A", "count": 0, "amount": 0.0, "orders": []},
+            "WATCHLIST": {"label": "Overdue (31–60 Days)", "color": "#EAB308", "count": 0, "amount": 0.0, "orders": []},
+            "HIGH_RISK": {"label": "High Risk (61–90 Days)", "color": "#F97316", "count": 0, "amount": 0.0, "orders": []},
+            "DEFAULT_DANGER": {"label": "Default Danger (>90 Days)", "color": "#DC2626", "count": 0, "amount": 0.0, "orders": []},
+        }
+
+        total_pending_debt = 0.0
+
+        for row in cursor.fetchall():
+            days = row["days_open"] or 0
+            amt = float(row["total_amount"])
+            total_pending_debt += amt
+
+            order_data = {
+                "credit_id": row["credit_id"],
+                "customer_name": row["customer_name"],
+                "phone": row["customer_phone"] or "—",
+                "amount": amt,
+                "days_open": days,
+                "date_taken": row["created_at"][:10],
+                "due_date": row["due_date"] or "—"
+            }
+
+            if days <= 30:
+                band_key = "CURRENT"
+            elif days <= 60:
+                band_key = "WATCHLIST"
+            elif days <= 90:
+                band_key = "HIGH_RISK"
+            else:
+                band_key = "DEFAULT_DANGER"
+
+            bands[band_key]["count"] += 1
+            bands[band_key]["amount"] += amt
+            bands[band_key]["orders"].append(order_data)
+
+        return {
+            "total_pending_debt": total_pending_debt,
+            "bands": bands
+        }
+    except sqlite3.Error as e:
+        logging.error(f"Error in get_credit_risk_matrix: {e}")
+        return {"total_pending_debt": 0.0, "bands": {}}
+    finally:
+        conn.close()
+
+
+def get_stockout_friction_matrix() -> List[Dict[str, Any]]:
+    """
+    Identifies parts with zero on-hand stock that have previous sales history
+    or high reorder thresholds, indicating ongoing lost retail revenue.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT p.part_id, p.part_number, p.name, p.brand, p.category,
+                   p.reorder_level, p.selling_price,
+                   COALESCE(SUM(si.quantity), 0) as past_units_sold,
+                   (p.reorder_level * p.selling_price) as estimated_lost_sale_exposure
+            FROM Part p
+            LEFT JOIN SaleItem si ON p.part_id = si.part_id
+            WHERE p.quantity_on_hand = 0
+              AND p.name NOT LIKE '[DEACTIVATED]%'
+            GROUP BY p.part_id
+            ORDER BY past_units_sold DESC, estimated_lost_sale_exposure DESC
+            LIMIT 40
+        """)
+        return [
+            {
+                "part_number": r["part_number"],
+                "name": r["name"],
+                "brand": r["brand"],
+                "category": r["category"],
+                "reorder_level": r["reorder_level"],
+                "selling_price": r["selling_price"],
+                "past_units_sold": r["past_units_sold"],
+                "lost_sale_exposure": float(r["estimated_lost_sale_exposure"] or 0.0)
+            }
+            for r in cursor.fetchall()
+        ]
+    except sqlite3.Error as e:
+        logging.error(f"Error in get_stockout_friction_matrix: {e}")
+        return []
+    finally:
+        conn.close()
+

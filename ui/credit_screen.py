@@ -8,10 +8,11 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QDialog, QFormLayout, QComboBox, QDateEdit,
-    QTextEdit, QFrame, QTabWidget, QSpinBox
+    QTextEdit, QFrame, QTabWidget, QSpinBox, QInputDialog
 )
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont
+from utils.whatsapp_helper import build_credit_reminder_message, open_whatsapp_chat
 
 from models.user import User
 from models.credit_order import CreditOrder
@@ -646,6 +647,29 @@ class CreditScreen(QWidget):
             pay_btn.clicked.connect(lambda checked, ord=o: self.settle_order(ord))
             action_layout.addWidget(pay_btn)
 
+            wa_btn = QPushButton("📲 WhatsApp")
+            wa_btn.setFixedHeight(28)
+            wa_btn.setMinimumWidth(85)
+            wa_btn.setCursor(Qt.PointingHandCursor)
+            wa_btn.setToolTip(f"Send payment reminder to {o.customer_name} via WhatsApp")
+            wa_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #F0FDF4;
+                    color: #166534;
+                    border: 1px solid #86EFAC;
+                    border-radius: 4px;
+                    font-weight: 600;
+                    font-size: 11px;
+                    padding: 2px 6px;
+                }
+                QPushButton:hover {
+                    background-color: #DCFCE7;
+                    border-color: #22C55E;
+                }
+            """)
+            wa_btn.clicked.connect(lambda checked, ord=o: self.send_whatsapp_reminder(ord))
+            action_layout.addWidget(wa_btn)
+
             self.pending_table.setCellWidget(row, 7, action_widget)
 
         # Load Paid Orders
@@ -757,3 +781,36 @@ class CreditScreen(QWidget):
                 self.refresh()
             else:
                 QMessageBox.critical(self, "Error", msg)
+
+    def send_whatsapp_reminder(self, order: CreditOrder):
+        """Dispatches a pre-formatted credit payment reminder to the customer via WhatsApp."""
+        phone = order.customer_phone
+        if not phone or not phone.strip():
+            phone_input, ok = QInputDialog.getText(
+                self, "Customer Phone Required",
+                f"Enter WhatsApp phone number for {order.customer_name}:"
+            )
+            if not ok or not phone_input.strip():
+                return
+            phone = phone_input.strip()
+
+        msg = build_credit_reminder_message(
+            customer_name=order.customer_name,
+            credit_order_id=order.credit_id,
+            total_amount=order.total_amount,
+            due_date=order.due_date
+        )
+
+        opened = open_whatsapp_chat(phone, msg)
+        if opened:
+            QMessageBox.information(
+                self, "WhatsApp Dispatched",
+                f"WhatsApp chat opened for {order.customer_name} ({phone})!\n"
+                f"Click 'Send' in WhatsApp to deliver the payment reminder."
+            )
+        else:
+            QMessageBox.warning(
+                self, "WhatsApp Error",
+                f"Could not open WhatsApp for phone '{phone}'. Please verify the number."
+            )
+

@@ -24,6 +24,8 @@ from managers.customer_manager import get_all_customers
 from managers.credit_manager import create_credit_order
 from managers.settings_manager import get_all_settings
 from utils.thermal_receipt import print_credit_thermal_receipt
+from utils.currency_engine import get_all_currency_equivalents, calculate_tender_change, format_currency
+from utils.whatsapp_helper import build_pos_receipt_message, open_whatsapp_chat
 from ui.theme import (
     MetricStatCard, StockBadgeDelegate, create_primary_action_button,
     create_orange_button, COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
@@ -173,6 +175,17 @@ class POSScreen(QWidget):
             color: {COLOR_TEXT_PRIMARY};
         """)
         card_layout.addWidget(self.total_label)
+
+        # Multi-currency live equivalent chips
+        self.currency_chips_label = QLabel("≈ 0.00 ZiG  |  ≈ R 0.00")
+        self.currency_chips_label.setAlignment(Qt.AlignRight)
+        self.currency_chips_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: 700;
+            color: #0284C7;
+            padding: 1px 2px;
+        """)
+        card_layout.addWidget(self.currency_chips_label)
 
         # Customer & Payment fields
         form_row = QHBoxLayout()
@@ -422,7 +435,13 @@ class POSScreen(QWidget):
         finally:
             self.cart_table.setUpdatesEnabled(True)
 
+        self._update_total_labels()
+
+    def _update_total_labels(self):
+        total_amount = sum(i.subtotal for i in self.cart_items.values())
+        equiv = get_all_currency_equivalents(total_amount)
         self.total_label.setText(f"Total: ${total_amount:.2f}")
+        self.currency_chips_label.setText(f"≈ {equiv['ZIG']}   |   ≈ {equiv['ZAR']}")
 
     def refresh_catalog(self):
         """Reload the full part catalog from the database (picks up newly stocked items)."""
@@ -443,8 +462,7 @@ class POSScreen(QWidget):
                 row = items_list.index(part_id)
                 self.cart_table.setItem(row, 3, QTableWidgetItem(f"${item.subtotal:.2f}"))
             # Recalculate total
-            total_amount = sum(i.subtotal for i in self.cart_items.values())
-            self.total_label.setText(f"Total: ${total_amount:.2f}")
+            self._update_total_labels()
 
     def remove_from_cart(self, part_id):
         if part_id in self.cart_items:
@@ -544,17 +562,60 @@ class POSScreen(QWidget):
         )
 
         if success:
+            import os
+            receipt_filename = os.path.basename(result_msg) if result_msg else "Receipt"
+            rec_num = os.path.splitext(receipt_filename)[0]
+
             settings = get_all_settings()
             prt_name = settings.get("thermal_printer_name", "").strip()
-            prt_info = f"Thermal receipt sent to: {prt_name}" if prt_name else "Note: You can select a thermal printer under Settings."
+            prt_info = f"Thermal receipt sent to: {prt_name}" if prt_name else "Note: You can configure a thermal receipt printer under Settings."
 
-            QMessageBox.information(
-                self, "Sale Complete",
-                f"Sale completed successfully!\n"
-                f"Total Amount: ${total_checkout_amount:.2f}\n"
-                f"Payment Method: {payment_method}\n\n"
+            equiv = get_all_currency_equivalents(total_checkout_amount)
+
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Sale Complete")
+            msg_box.setIcon(QMessageBox.Information)
+            msg_box.setText(
+                f"<b>Sale Completed Successfully!</b><br><br>"
+                f"Receipt #: <b>{rec_num}</b><br>"
+                f"Total Amount: <b>${total_checkout_amount:.2f}</b><br>"
+                f"Equivalent: <b>{equiv['ZIG']}</b> &nbsp;|&nbsp; <b>{equiv['ZAR']}</b><br>"
+                f"Payment Method: <b>{payment_method}</b><br><br>"
                 f"{prt_info}"
             )
+            wa_receipt_btn = msg_box.addButton("📲 Send WhatsApp Receipt", QMessageBox.ActionRole)
+            ok_btn = msg_box.addButton("Done", QMessageBox.AcceptRole)
+            msg_box.setDefaultButton(ok_btn)
+
+            msg_box.exec()
+
+            if msg_box.clickedButton() == wa_receipt_btn:
+                # Find phone for selected customer
+                cust_phone = ""
+                if customer_id:
+                    for c in self._customers:
+                        if c.customer_id == customer_id:
+                            cust_phone = c.phone or ""
+                            break
+
+                if not cust_phone:
+                    phone_input, p_ok = QInputDialog.getText(
+                        self, "WhatsApp Receipt",
+                        f"Enter customer WhatsApp phone number for {customer_name}:"
+                    )
+                    if p_ok and phone_input.strip():
+                        cust_phone = phone_input.strip()
+
+                if cust_phone:
+                    wa_msg = build_pos_receipt_message(
+                        customer_name=customer_name,
+                        receipt_number=rec_num,
+                        items=items,
+                        total_amount=total_checkout_amount,
+                        payment_method=payment_method
+                    )
+                    open_whatsapp_chat(cust_phone, wa_msg)
+
             self.cart_items.clear()
             self.update_cart_display()
             self.search_input.clear()

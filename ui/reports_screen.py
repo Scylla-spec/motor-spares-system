@@ -9,8 +9,10 @@ from datetime import date
 from managers.reports_manager import (
     get_daily_sales_summary, get_monthly_sales_summary,
     get_monthly_transactions,
-    get_top_selling_parts, get_low_stock_parts, get_profit_margin_report
+    get_top_selling_parts, get_low_stock_parts, get_profit_margin_report,
+    get_dead_capital_matrix, get_credit_risk_matrix, get_stockout_friction_matrix
 )
+from utils.whatsapp_helper import build_credit_reminder_message, open_whatsapp_chat
 from managers.inventory_manager import record_stock_in
 from managers.supplier_manager import get_all_suppliers
 from managers.wishlist_manager import (
@@ -48,6 +50,7 @@ class ReportsScreen(QWidget):
         tabs.addTab(self._build_top_sellers_tab(), "Top Sellers")
         tabs.addTab(self._build_low_stock_tab(), "Low Stock Alert")
         tabs.addTab(self._build_margin_tab(), "Profit Margins")
+        tabs.addTab(self._build_diagnostic_matrix_tab(), "Diagnostic Health Matrix")
         layout.addWidget(tabs)
 
     # ------------------------------------------------------------------ Sales Summary
@@ -566,3 +569,208 @@ class ReportsScreen(QWidget):
         t.setSelectionBehavior(QTableWidget.SelectRows)
         t.verticalHeader().setVisible(False)
         return t
+
+    # ------------------------------------------------------------------ Diagnostic Health Matrix (NuClass Model)
+    def _build_diagnostic_matrix_tab(self):
+        w = QWidget()
+        layout = QVBoxLayout(w)
+        layout.setSpacing(12)
+
+        # Header note
+        banner = QFrame()
+        banner.setStyleSheet("""
+            QFrame {
+                background-color: #F8FAFC;
+                border: 1px solid #CBD5E1;
+                border-left: 4px solid #0284C7;
+                border-radius: 6px;
+                padding: 10px 14px;
+            }
+        """)
+        b_layout = QVBoxLayout(banner)
+        b_layout.setSpacing(4)
+        b_title = QLabel("Business Health & Profit Leakage Diagnostic Matrix")
+        b_title.setStyleSheet("font-size: 14px; font-weight: 700; color: #0F172A;")
+        b_layout.addWidget(b_title)
+
+        b_sub = QLabel(
+            "Inspired by institutional diagnostic matrices. Dissects operational data to identify root causes "
+            "of retail failure: frozen capital in stagnant inventory, customer default hazard, and lost sales from stockouts."
+        )
+        b_sub.setStyleSheet("font-size: 12px; color: #64748B;")
+        b_sub.setWordWrap(True)
+        b_layout.addWidget(b_sub)
+        layout.addWidget(banner)
+
+        # Controls & KPI row
+        top_row = QHBoxLayout()
+        self.dead_capital_kpi = MetricStatCard("TIED-UP DEAD CAPITAL", "$0.00")
+        self.credit_risk_kpi = MetricStatCard("OVERDUE DEBT EXPOSURE", "$0.00")
+        self.stockout_kpi = MetricStatCard("EST. STOCKOUT LOSS", "$0.00")
+        top_row.addWidget(self.dead_capital_kpi)
+        top_row.addWidget(self.credit_risk_kpi)
+        top_row.addWidget(self.stockout_kpi)
+
+        controls = QVBoxLayout()
+        controls.setSpacing(6)
+        c_label = QLabel("Aging Threshold:")
+        c_label.setStyleSheet("font-size: 11px; font-weight: 700; color: #475569;")
+        self.aging_combo = QComboBox()
+        self.aging_combo.addItem("60 Days Without Sale", 60)
+        self.aging_combo.addItem("90 Days Without Sale (Standard)", 90)
+        self.aging_combo.addItem("180 Days Without Sale (Severe)", 180)
+        self.aging_combo.setCurrentIndex(1)
+        self.aging_combo.currentIndexChanged.connect(self.load_diagnostic_matrix)
+
+        refresh_matrix_btn = QPushButton("⟳ Run Diagnostic")
+        refresh_matrix_btn.setFixedHeight(30)
+        refresh_matrix_btn.clicked.connect(self.load_diagnostic_matrix)
+
+        controls.addWidget(c_label)
+        controls.addWidget(self.aging_combo)
+        controls.addWidget(refresh_matrix_btn)
+        top_row.addLayout(controls)
+
+        layout.addLayout(top_row)
+
+        # Inner Subtabs
+        self.diag_subtabs = QTabWidget()
+
+        # 1. Dead Capital Matrix Table
+        self.dead_capital_table = self._make_table([
+            "Category", "Part #", "Part Name", "Brand", "In Stock", "Cost ($)", "Tied-up Capital ($)", "Last Sold Date"
+        ])
+        self.diag_subtabs.addTab(self.dead_capital_table, "1. Dead Capital (Aging Stock)")
+
+        # 2. Credit Risk Matrix Table
+        self.credit_risk_table = self._make_table([
+            "Risk Band", "Customer Name", "Phone", "Order #", "Date Taken", "Days Open", "Total Due", "Action"
+        ])
+        self.diag_subtabs.addTab(self.credit_risk_table, "2. Credit Default Vulnerability")
+
+        # 3. Stockout Friction Matrix Table
+        self.stockout_table = self._make_table([
+            "Part #", "Part Name", "Brand", "Category", "Past Sold Qty", "Reorder Level", "Selling Price", "Est. Lost Revenue ($)"
+        ])
+        self.diag_subtabs.addTab(self.stockout_table, "3. Stockout Friction (Lost Sales)")
+
+        layout.addWidget(self.diag_subtabs)
+
+        self.load_diagnostic_matrix()
+        return w
+
+    def load_diagnostic_matrix(self):
+        threshold_days = self.aging_combo.currentData() or 90
+
+        # 1. Dead Capital Matrix
+        dead_data = get_dead_capital_matrix(days_threshold=threshold_days)
+        self.dead_capital_kpi.set_value(f"${dead_data['total_frozen_capital']:,.2f}")
+
+        parts = dead_data["stagnant_parts"]
+        self.dead_capital_table.setRowCount(len(parts))
+        for row, p in enumerate(parts):
+            self.dead_capital_table.setItem(row, 0, QTableWidgetItem(p["category"]))
+            self.dead_capital_table.setItem(row, 1, QTableWidgetItem(p["part_number"]))
+            self.dead_capital_table.setItem(row, 2, QTableWidgetItem(p["name"]))
+            self.dead_capital_table.setItem(row, 3, QTableWidgetItem(p["brand"]))
+            self.dead_capital_table.setItem(row, 4, QTableWidgetItem(str(p["quantity"])))
+            self.dead_capital_table.setItem(row, 5, QTableWidgetItem(f"${p['cost_price']:.2f}"))
+
+            tied_item = QTableWidgetItem(f"${p['tied_up_cost']:,.2f}")
+            tied_item.setForeground(QColor("#B91C1C"))
+            self.dead_capital_table.setItem(row, 6, tied_item)
+
+            self.dead_capital_table.setItem(row, 7, QTableWidgetItem(p["last_sold"]))
+
+        # 2. Credit Risk Matrix
+        credit_data = get_credit_risk_matrix()
+        bands = credit_data["bands"]
+        overdue_amt = 0.0
+        if "WATCHLIST" in bands:
+            overdue_amt += bands["WATCHLIST"]["amount"]
+        if "HIGH_RISK" in bands:
+            overdue_amt += bands["HIGH_RISK"]["amount"]
+        if "DEFAULT_DANGER" in bands:
+            overdue_amt += bands["DEFAULT_DANGER"]["amount"]
+
+        self.credit_risk_kpi.set_value(f"${overdue_amt:,.2f}")
+
+        all_orders = []
+        for band_key, band_info in bands.items():
+            for o in band_info["orders"]:
+                all_orders.append((band_info["label"], band_info["color"], o))
+
+        self.credit_risk_table.setRowCount(len(all_orders))
+        for row, (band_label, band_color, ord_data) in enumerate(all_orders):
+            band_item = QTableWidgetItem(band_label)
+            band_item.setForeground(QColor(band_color))
+            self.credit_risk_table.setItem(row, 0, band_item)
+
+            self.credit_risk_table.setItem(row, 1, QTableWidgetItem(ord_data["customer_name"]))
+            self.credit_risk_table.setItem(row, 2, QTableWidgetItem(ord_data["phone"]))
+            self.credit_risk_table.setItem(row, 3, QTableWidgetItem(f"#{ord_data['credit_id']}"))
+            self.credit_risk_table.setItem(row, 4, QTableWidgetItem(ord_data["date_taken"]))
+            self.credit_risk_table.setItem(row, 5, QTableWidgetItem(f"{ord_data['days_open']} days"))
+
+            amt_item = QTableWidgetItem(f"${ord_data['amount']:.2f}")
+            amt_item.setForeground(QColor(band_color))
+            self.credit_risk_table.setItem(row, 6, amt_item)
+
+            # WhatsApp action button
+            wa_btn = QPushButton("📲 WhatsApp")
+            wa_btn.setFixedHeight(26)
+            wa_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #F0FDF4;
+                    color: #166534;
+                    border: 1px solid #86EFAC;
+                    border-radius: 4px;
+                    font-weight: 600;
+                    font-size: 11px;
+                }
+                QPushButton:hover {
+                    background-color: #DCFCE7;
+                }
+            """)
+            wa_btn.clicked.connect(lambda checked, o=ord_data: self._send_diag_whatsapp(o))
+            self.credit_risk_table.setCellWidget(row, 7, wa_btn)
+
+        # 3. Stockout Friction Matrix
+        stockout_data = get_stockout_friction_matrix()
+        total_lost_exposure = sum(s["lost_sale_exposure"] for s in stockout_data)
+        self.stockout_kpi.set_value(f"${total_lost_exposure:,.2f}")
+
+        self.stockout_table.setRowCount(len(stockout_data))
+        for row, s in enumerate(stockout_data):
+            self.stockout_table.setItem(row, 0, QTableWidgetItem(s["part_number"]))
+            self.stockout_table.setItem(row, 1, QTableWidgetItem(s["name"]))
+            self.stockout_table.setItem(row, 2, QTableWidgetItem(s["brand"]))
+            self.stockout_table.setItem(row, 3, QTableWidgetItem(s["category"]))
+            self.stockout_table.setItem(row, 4, QTableWidgetItem(str(s["past_units_sold"])))
+            self.stockout_table.setItem(row, 5, QTableWidgetItem(str(s["reorder_level"])))
+            self.stockout_table.setItem(row, 6, QTableWidgetItem(f"${s['selling_price']:.2f}"))
+
+            loss_item = QTableWidgetItem(f"${s['lost_sale_exposure']:,.2f}")
+            loss_item.setForeground(QColor("#DC2626"))
+            self.stockout_table.setItem(row, 7, loss_item)
+
+    def _send_diag_whatsapp(self, ord_data: dict):
+        phone = ord_data.get("phone", "")
+        if not phone or phone == "—":
+            from PySide6.QtWidgets import QInputDialog
+            phone_input, ok = QInputDialog.getText(
+                self, "Customer Phone Required",
+                f"Enter WhatsApp phone number for {ord_data['customer_name']}:"
+            )
+            if not ok or not phone_input.strip():
+                return
+            phone = phone_input.strip()
+
+        msg = build_credit_reminder_message(
+            customer_name=ord_data["customer_name"],
+            credit_order_id=ord_data["credit_id"],
+            total_amount=ord_data["amount"],
+            due_date=ord_data.get("due_date")
+        )
+        open_whatsapp_chat(phone, msg)
+

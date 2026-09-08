@@ -177,6 +177,49 @@ class SettingsScreen(QWidget):
         p_layout.addLayout(p_form)
         layout.addWidget(printer_group)
 
+        # Multi-Currency & WhatsApp Configuration Card
+        currency_group = QFrame()
+        currency_group.setStyleSheet(f"""
+            QFrame {{
+                background-color: #FFFFFF;
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 8px;
+                padding: 16px;
+            }}
+        """)
+        c_layout = QVBoxLayout(currency_group)
+        c_layout.setSpacing(12)
+
+        currency_title = QLabel("Multi-Currency & WhatsApp Direct (Southern Africa POS)")
+        currency_title.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
+        c_layout.addWidget(currency_title)
+
+        currency_subtitle = QLabel(
+            "Configure daily counter exchange rates and default messaging country code. "
+            "The POS cart dynamically computes live ZiG and ZAR totals and change."
+        )
+        currency_subtitle.setStyleSheet(f"font-size: 12px; color: {COLOR_TEXT_SECONDARY};")
+        currency_subtitle.setWordWrap(True)
+        c_layout.addWidget(currency_subtitle)
+
+        c_form = QFormLayout()
+        c_form.setSpacing(10)
+
+        self.rate_zig_input = QLineEdit()
+        self.rate_zig_input.setPlaceholderText("e.g. 26.50")
+        c_form.addRow("USD to ZiG Rate (1 USD = X ZiG):", self.rate_zig_input)
+
+        self.rate_zar_input = QLineEdit()
+        self.rate_zar_input.setPlaceholderText("e.g. 18.20")
+        c_form.addRow("USD to ZAR Rate (1 USD = X ZAR):", self.rate_zar_input)
+
+        self.phone_prefix_input = QLineEdit()
+        self.phone_prefix_input.setPlaceholderText("+263")
+        c_form.addRow("WhatsApp Country Code:", self.phone_prefix_input)
+
+        c_layout.addLayout(c_form)
+        layout.addWidget(currency_group)
+
         self.save_btn = QPushButton("Save All Settings")
         self.save_btn.setStyleSheet(f"""
             QPushButton {{
@@ -235,6 +278,11 @@ class SettingsScreen(QWidget):
 
         self.auto_print_check.setChecked(settings.get("thermal_auto_print", "1") == "1")
         self.cut_paper_check.setChecked(settings.get("thermal_cut_paper", "1") == "1")
+
+        # Load currency and phone settings
+        self.rate_zig_input.setText(settings.get("rate_zig", "26.50"))
+        self.rate_zar_input.setText(settings.get("rate_zar", "18.20"))
+        self.phone_prefix_input.setText(settings.get("phone_country_code", "+263"))
 
     def handle_test_print(self):
         printer_name = self.printer_combo.currentData()
@@ -297,6 +345,9 @@ class SettingsScreen(QWidget):
             "thermal_paper_width": self.paper_width_combo.currentData() or "80",
             "thermal_auto_print": "1" if self.auto_print_check.isChecked() else "0",
             "thermal_cut_paper": "1" if self.cut_paper_check.isChecked() else "0",
+            "rate_zig": self.rate_zig_input.text().strip() or "26.50",
+            "rate_zar": self.rate_zar_input.text().strip() or "18.20",
+            "phone_country_code": self.phone_prefix_input.text().strip() or "+263",
         }
         if not values["shop_name"]:
             QMessageBox.warning(self, "Validation Error", "Shop name is required.")
