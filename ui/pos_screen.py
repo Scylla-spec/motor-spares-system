@@ -25,7 +25,7 @@ from managers.credit_manager import create_credit_order
 from ui.theme import (
     MetricStatCard, StockBadgeDelegate, create_primary_action_button,
     create_orange_button, COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
-    COLOR_PRIMARY_ORANGE, PlusMinusSpinBox, ScreenHeader, ICON_POS
+    COLOR_PRIMARY_ORANGE, PlusMinusSpinBox, ScreenHeader, ICON_POS, QuantityStepper
 )
 
 
@@ -62,9 +62,38 @@ class POSScreen(QWidget):
         left_layout.setContentsMargins(0, 0, 8, 0)
         left_layout.setSpacing(8)
 
+        # Header row with label + refresh button
+        catalog_header_row = QHBoxLayout()
         left_header = QLabel("Part Catalog")
         left_header.setStyleSheet(f"font-size: 14px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
-        left_layout.addWidget(left_header)
+        catalog_header_row.addWidget(left_header)
+        catalog_header_row.addStretch()
+
+        self.refresh_btn = QPushButton("⟳ Refresh")
+        self.refresh_btn.setFixedHeight(28)
+        self.refresh_btn.setCursor(Qt.PointingHandCursor)
+        self.refresh_btn.setToolTip("Reload parts from inventory (picks up newly stocked items)")
+        self.refresh_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #F1F5F9;
+                color: {COLOR_TEXT_PRIMARY};
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 5px;
+                font-size: 12px;
+                font-weight: 600;
+                padding: 0px 10px;
+            }}
+            QPushButton:hover {{
+                background-color: #E2E8F0;
+                border-color: #94A3B8;
+            }}
+            QPushButton:pressed {{
+                background-color: #CBD5E1;
+            }}
+        """)
+        self.refresh_btn.clicked.connect(self.refresh_catalog)
+        catalog_header_row.addWidget(self.refresh_btn)
+        left_layout.addLayout(catalog_header_row)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Scan barcode or search by part#, name, brand...")
@@ -328,62 +357,92 @@ class POSScreen(QWidget):
         self.update_cart_display()
 
     def update_cart_display(self):
-        self.cart_table.setRowCount(len(self.cart_items))
-        total_amount = 0.0
+        items_list = list(self.cart_items.items())  # snapshot to avoid dict-change issues
 
-        for row, (part_id, item) in enumerate(self.cart_items.items()):
-            part_num_item = QTableWidgetItem(item.part_number)
-            font = QFont()
-            font.setBold(True)
-            part_num_item.setFont(font)
-            self.cart_table.setItem(row, 0, part_num_item)
+        self.cart_table.setUpdatesEnabled(False)
+        try:
+            # Clear existing cell widgets before resizing to avoid Qt widget ownership issues
+            for r in range(self.cart_table.rowCount()):
+                self.cart_table.removeCellWidget(r, 2)
+                self.cart_table.removeCellWidget(r, 4)
 
-            self.cart_table.setItem(row, 1, QTableWidgetItem(item.part_name))
+            self.cart_table.setRowCount(len(items_list))
+            total_amount = 0.0
 
-            # Unmistakable +/- quantity stepper
-            stepper = QuantityStepper(value=item.quantity, min_val=1, max_val=100000)
-            stepper.set_on_change(lambda val, pid=part_id: self.change_cart_qty(pid, val))
-            self.cart_table.setCellWidget(row, 2, stepper)
+            for row, (part_id, item) in enumerate(items_list):
+                # Col 0: Part Number
+                part_num_item = QTableWidgetItem(item.part_number)
+                font = QFont()
+                font.setBold(True)
+                part_num_item.setFont(font)
+                self.cart_table.setItem(row, 0, part_num_item)
 
-            self.cart_table.setItem(row, 3, QTableWidgetItem(f"${item.subtotal:.2f}"))
+                # Col 1: Name
+                self.cart_table.setItem(row, 1, QTableWidgetItem(item.part_name))
 
-            # Centered 🗑 Delete button
-            del_widget = QWidget()
-            del_layout = QHBoxLayout(del_widget)
-            del_layout.setContentsMargins(2, 2, 2, 2)
-            del_layout.setAlignment(Qt.AlignCenter)
+                # Col 2: Quantity stepper widget
+                stepper = QuantityStepper(value=item.quantity, min_val=1, max_val=100000)
+                stepper.set_on_change(lambda val, pid=part_id: self.change_cart_qty(pid, val))
+                self.cart_table.setCellWidget(row, 2, stepper)
 
-            remove_btn = QPushButton("🗑")
-            remove_btn.setToolTip("Delete from cart")
-            remove_btn.setFixedSize(30, 28)
-            remove_btn.setCursor(Qt.PointingHandCursor)
-            remove_btn.setStyleSheet("""
-                QPushButton {
-                    color: #DC2626;
-                    background-color: #FFFFFF;
-                    border: 1px solid #FECACA;
-                    border-radius: 4px;
-                    font-size: 14px;
-                    padding: 0px;
-                }
-                QPushButton:hover {
-                    background-color: #FEF2F2;
-                    border-color: #F87171;
-                }
-            """)
-            remove_btn.clicked.connect(lambda checked, pid=part_id: self.remove_from_cart(pid))
-            del_layout.addWidget(remove_btn)
-            self.cart_table.setCellWidget(row, 4, del_widget)
+                # Col 3: Subtotal
+                self.cart_table.setItem(row, 3, QTableWidgetItem(f"${item.subtotal:.2f}"))
 
-            total_amount += item.subtotal
+                # Col 4: Delete button (wrapped in a widget for centering)
+                del_widget = QWidget()
+                del_layout = QHBoxLayout(del_widget)
+                del_layout.setContentsMargins(2, 2, 2, 2)
+                del_layout.setAlignment(Qt.AlignCenter)
+
+                remove_btn = QPushButton("🗑")
+                remove_btn.setToolTip("Delete from cart")
+                remove_btn.setFixedSize(30, 28)
+                remove_btn.setCursor(Qt.PointingHandCursor)
+                remove_btn.setStyleSheet("""
+                    QPushButton {
+                        color: #DC2626;
+                        background-color: #FFFFFF;
+                        border: 1px solid #FECACA;
+                        border-radius: 4px;
+                        font-size: 14px;
+                        padding: 0px;
+                    }
+                    QPushButton:hover {
+                        background-color: #FEF2F2;
+                        border-color: #F87171;
+                    }
+                """)
+                remove_btn.clicked.connect(lambda checked, pid=part_id: self.remove_from_cart(pid))
+                del_layout.addWidget(remove_btn)
+                self.cart_table.setCellWidget(row, 4, del_widget)
+
+                total_amount += item.subtotal
+        finally:
+            self.cart_table.setUpdatesEnabled(True)
 
         self.total_label.setText(f"Total: ${total_amount:.2f}")
+
+    def refresh_catalog(self):
+        """Reload the full part catalog from the database (picks up newly stocked items)."""
+        self.refresh_btn.setText("⟳ Refreshing...")
+        self.refresh_btn.setEnabled(False)
+        self.perform_search(self.search_input.text())
+        self.refresh_btn.setText("⟳ Refresh")
+        self.refresh_btn.setEnabled(True)
 
     def change_cart_qty(self, part_id, new_qty):
         if part_id in self.cart_items:
             self.cart_items[part_id].quantity = new_qty
-            # Update subtotal cell directly or refresh
-            self.update_cart_display()
+            # Only update the subtotal cell — avoid full re-render which resets the stepper
+            item = self.cart_items[part_id]
+            # Find the row for this part_id
+            items_list = list(self.cart_items.keys())
+            if part_id in items_list:
+                row = items_list.index(part_id)
+                self.cart_table.setItem(row, 3, QTableWidgetItem(f"${item.subtotal:.2f}"))
+            # Recalculate total
+            total_amount = sum(i.subtotal for i in self.cart_items.values())
+            self.total_label.setText(f"Total: ${total_amount:.2f}")
 
     def remove_from_cart(self, part_id):
         if part_id in self.cart_items:
