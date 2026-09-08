@@ -11,6 +11,10 @@ DEFAULTS = {
     "phone": "+263 77 123 4567",
     "receipt_footer": "Thank you for your business!",
     "logo_path": "",
+    "thermal_printer_name": "",
+    "thermal_paper_width": "80",
+    "thermal_auto_print": "1",
+    "thermal_cut_paper": "1",
 }
 
 

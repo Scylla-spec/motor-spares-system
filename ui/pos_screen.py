@@ -22,6 +22,8 @@ from managers.inventory_manager import search_parts, get_all_parts
 from managers.sales_manager import process_sale
 from managers.customer_manager import get_all_customers
 from managers.credit_manager import create_credit_order
+from managers.settings_manager import get_all_settings
+from utils.thermal_receipt import print_credit_thermal_receipt
 from ui.theme import (
     MetricStatCard, StockBadgeDelegate, create_primary_action_button,
     create_orange_button, COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
@@ -501,10 +503,26 @@ class POSScreen(QWidget):
                 customer_id=customer_id
             )
             if success:
+                # Attempt thermal credit docket print
+                credit_prt_info = ""
+                try:
+                    p_ok, p_msg = print_credit_thermal_receipt(
+                        credit_order_id=credit_id,
+                        customer_name=customer_name,
+                        items=credit_items,
+                        total_amount=sum(it["quantity"] * it["unit_price"] for it in credit_items),
+                        cashier_name=self.current_user.username
+                    )
+                    if p_ok:
+                        credit_prt_info = "\n\nThermal receipt printed to receipt machine."
+                except Exception as th_err:
+                    import logging
+                    logging.warning(f"Credit receipt thermal print error: {th_err}")
+
                 QMessageBox.information(
                     self, "Credit Order Created",
                     f"Credit Order #{credit_id} recorded for {customer_name}!\n"
-                    f"This transaction is now logged under the 'Pay Later / On Credit' tab as Pending."
+                    f"This transaction is now logged under the 'Pay Later / On Credit' tab as Pending.{credit_prt_info}"
                 )
                 self.cart_items.clear()
                 self.update_cart_display()
@@ -513,6 +531,8 @@ class POSScreen(QWidget):
             else:
                 QMessageBox.critical(self, "Credit Order Failed", msg)
             return
+
+        total_checkout_amount = sum(it.subtotal for it in items)
 
         success, result_msg = process_sale(
             cart_items=items,
@@ -524,7 +544,17 @@ class POSScreen(QWidget):
         )
 
         if success:
-            QMessageBox.information(self, "Sale Complete", f"Sale completed successfully!\nReceipt generated at:\n{result_msg}")
+            settings = get_all_settings()
+            prt_name = settings.get("thermal_printer_name", "").strip()
+            prt_info = f"Thermal receipt sent to: {prt_name}" if prt_name else "Note: You can select a thermal printer under Settings."
+
+            QMessageBox.information(
+                self, "Sale Complete",
+                f"Sale completed successfully!\n"
+                f"Total Amount: ${total_checkout_amount:.2f}\n"
+                f"Payment Method: {payment_method}\n\n"
+                f"{prt_info}"
+            )
             self.cart_items.clear()
             self.update_cart_display()
             self.search_input.clear()

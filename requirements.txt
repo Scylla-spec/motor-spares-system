@@ -8,3 +8,5 @@ python-Levenshtein
 matplotlib
 pytesseract
 Pillow
+python-escpos
+pywin32

@@ -5,6 +5,7 @@ from typing import Tuple, List
 from database.db_manager import get_connection
 from models.sale import Sale, SaleItem
 from utils.receipt_generator import generate_pdf_receipt
+from utils.thermal_receipt import print_thermal_receipt
 from utils.numbering import generate_receipt_number
 
 
@@ -72,6 +73,12 @@ def process_sale(cart_items: List[SaleItem], payment_method: str, cashier_id: in
             items=cart_items
         )
         receipt_path = generate_pdf_receipt(sale_record, receipt_number, cashier_name, customer_name)
+
+        # Print thermal receipt (supermarket-style)
+        try:
+            print_thermal_receipt(sale_record, receipt_number, cashier_name, customer_name)
+        except Exception as th_err:
+            logging.warning(f"Thermal receipt printing error: {th_err}")
 
         return True, receipt_path
 
