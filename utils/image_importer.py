@@ -32,9 +32,10 @@ from utils.excel_importer import COLUMN_ALIASES, _normalise, auto_correct_rows
 
 import os
 import shutil
+import platform
 
 # ---------------------------------------------------------------------------
-# Tesseract availability check — auto-detect standard install locations on Windows
+# Tesseract availability check — cross-platform auto-detection (Windows, macOS, Linux)
 # ---------------------------------------------------------------------------
 TESSERACT_AVAILABLE: bool = False
 TESSERACT_ERROR: str = ""
@@ -43,12 +44,20 @@ try:
     import pytesseract
     from pytesseract import Output
 
-    # Check standard Windows paths if not already in system PATH
+    # Check standard paths across Windows, macOS, Linux if not already in system PATH
     _candidate_paths = [
         os.environ.get("TESSERACT_PATH", ""),
+        shutil.which("tesseract") or "",
+        # Windows standard locations
         r"C:\Program Files\Tesseract-OCR\tesseract.exe",
         r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
         os.path.expanduser(r"~\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"),
+        # macOS standard locations (Homebrew / Intel / Apple Silicon)
+        "/opt/homebrew/bin/tesseract",
+        "/usr/local/bin/tesseract",
+        # Linux standard locations
+        "/usr/bin/tesseract",
+        "/usr/local/bin/tesseract",
     ]
     for _path in _candidate_paths:
         if _path and os.path.exists(_path):
@@ -64,18 +73,44 @@ except Exception as _tess_err:
     logging.warning(f"Tesseract OCR not available: {_tess_err}")
 
 
+def _build_tesseract_install_guide() -> str:
+    """Returns OS-appropriate installation instructions for Tesseract OCR."""
+    sys_name = platform.system()
+    if sys_name == "Darwin":
+        return (
+            "Tesseract OCR is not installed on this macOS system.\n\n"
+            "To enable image import, install it using Homebrew:\n\n"
+            "    brew install tesseract\n\n"
+            "After installing, restart the Motor Spares System and try again."
+        )
+    elif sys_name == "Linux":
+        return (
+            "Tesseract OCR is not installed on this Linux system.\n\n"
+            "To enable image import, install it using your package manager:\n\n"
+            "  Ubuntu / Debian:\n"
+            "    sudo apt update && sudo apt install tesseract-ocr\n\n"
+            "  Fedora / RHEL:\n"
+            "    sudo dnf install tesseract\n\n"
+            "  Arch Linux:\n"
+            "    sudo pacman -S tesseract\n\n"
+            "After installing, restart the Motor Spares System and try again."
+        )
+    else:
+        return (
+            "Tesseract OCR is not installed on this computer.\n\n"
+            "To enable image import, install it using ONE of these methods:\n\n"
+            "  Option 1 — Windows Package Manager (recommended):\n"
+            "    Open a terminal and run:\n"
+            "    winget install UB-Mannheim.TesseractOCR\n\n"
+            "  Option 2 — Direct installer:\n"
+            "    Download from: https://github.com/UB-Mannheim/tesseract/wiki\n"
+            "    Run the installer, then restart this application.\n\n"
+            "After installing, restart the Motor Spares System and try again."
+        )
+
+
 # Install instructions shown to the user when Tesseract is missing
-TESSERACT_INSTALL_GUIDE = (
-    "Tesseract OCR is not installed on this computer.\n\n"
-    "To enable image import, install it using ONE of these methods:\n\n"
-    "  Option 1 — Windows Package Manager (recommended):\n"
-    "    Open a terminal and run:\n"
-    "    winget install UB-Mannheim.TesseractOCR\n\n"
-    "  Option 2 — Direct installer:\n"
-    "    Download from: https://github.com/UB-Mannheim/tesseract/wiki\n"
-    "    Run the installer, then restart this application.\n\n"
-    "After installing, restart the Motor Spares System and try again."
-)
+TESSERACT_INSTALL_GUIDE: str = _build_tesseract_install_guide()
 
 
 def is_tesseract_available() -> bool:
