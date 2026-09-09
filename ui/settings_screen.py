@@ -15,7 +15,8 @@ from utils.whatsapp_helper import build_credit_reminder_message
 from database.db_manager import get_connection, DB_PATH
 from ui.theme import (
     COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE,
-    COLOR_CANVAS_BG, ScreenHeader, ICON_SETTINGS
+    COLOR_CANVAS_BG, ScreenHeader, ICON_SETTINGS,
+    set_btn_icon, ICON_FOLDER, ICON_X, ICON_PRINTER, ICON_SEARCH, ICON_SAVE, ICON_DOWNLOAD
 )
 
 
@@ -23,10 +24,10 @@ class SettingsScreen(QWidget):
     """Admin-only screen for shop branding, hardware, multi-currency, and system configuration.
     
     Organized into clean, responsive category tabs with real-time interactive previews:
-    - 🏪 Store Profile & Identity (with live 80mm thermal receipt simulator)
-    - 🖨️ Thermal Receipt Machine (ESC/POS hardware diagnostics, paper width, automation)
-    - 💱 Multi-Currency && WhatsApp (live tender calculator and WhatsApp message preview)
-    - ℹ️ System & Diagnostics (database health check, 1-click backup, and catalog metrics)
+    - Store Profile & Identity (with live 80mm thermal receipt simulator)
+    - Thermal Receipt Machine (ESC/POS hardware diagnostics, paper width, automation)
+    - Multi-Currency & WhatsApp (live tender calculator and WhatsApp message preview)
+    - System & Diagnostics (database health check, 1-click backup, and catalog metrics)
     """
 
     def __init__(self, parent=None):
@@ -177,10 +178,10 @@ class SettingsScreen(QWidget):
         """)
 
         # Add Category Tabs (using && so ampersand is displayed literally in Qt)
-        self.tabs.addTab(self._create_branding_tab(), "🏪 Store Profile")
-        self.tabs.addTab(self._create_printer_tab(), "🖨️ Thermal Printer (ESC/POS)")
-        self.tabs.addTab(self._create_currency_tab(), "💱 Currency && WhatsApp")
-        self.tabs.addTab(self._create_system_tab(), "ℹ️ System Info")
+        self.tabs.addTab(self._create_branding_tab(), "Store Profile")
+        self.tabs.addTab(self._create_printer_tab(), "Thermal Printer (ESC/POS)")
+        self.tabs.addTab(self._create_currency_tab(), "Currency && WhatsApp")
+        self.tabs.addTab(self._create_system_tab(), "System Info")
 
         root_layout.addWidget(self.tabs, 1)
 
@@ -269,7 +270,7 @@ class SettingsScreen(QWidget):
         logo_btn_col = QVBoxLayout()
         logo_btn_col.setSpacing(8)
 
-        choose_logo_btn = QPushButton("📁 Choose Image...")
+        choose_logo_btn = QPushButton("Choose Image...")
         choose_logo_btn.setFixedHeight(34)
         choose_logo_btn.setStyleSheet("""
             QPushButton {
@@ -286,9 +287,10 @@ class SettingsScreen(QWidget):
             }
         """)
         choose_logo_btn.clicked.connect(self.choose_logo)
+        set_btn_icon(choose_logo_btn, ICON_FOLDER, size=14, color='#475569')
         logo_btn_col.addWidget(choose_logo_btn)
 
-        clear_logo_btn = QPushButton("✕ Remove Logo")
+        clear_logo_btn = QPushButton("Remove Logo")
         clear_logo_btn.setFixedHeight(30)
         clear_logo_btn.setStyleSheet("""
             QPushButton {
@@ -305,6 +307,7 @@ class SettingsScreen(QWidget):
             }
         """)
         clear_logo_btn.clicked.connect(self.clear_logo)
+        set_btn_icon(clear_logo_btn, ICON_X, size=13, color='#DC2626')
         logo_btn_col.addWidget(clear_logo_btn)
 
         logo_hint = QLabel("PNG or JPG (high-contrast monochrome logos print best on thermal paper)")
@@ -328,7 +331,7 @@ class SettingsScreen(QWidget):
         preview_layout.setSpacing(10)
 
         preview_header_row = QHBoxLayout()
-        preview_title = QLabel("📄 Live 80mm Receipt Simulator")
+        preview_title = QLabel("Live 80mm Receipt Simulator")
         preview_title.setStyleSheet(f"font-size: 14px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
         preview_header_row.addWidget(preview_title)
 
@@ -508,7 +511,7 @@ class SettingsScreen(QWidget):
         hw_form.addRow(self._make_field_label("Printer Device:"), printer_row)
 
         # Printer status pill
-        self.printer_status_pill = QLabel("⚪ No printer selected")
+        self.printer_status_pill = QLabel("No printer selected")
         self.printer_status_pill.setStyleSheet("""
             background-color: #F1F5F9;
             color: #475569;
@@ -582,7 +585,7 @@ class SettingsScreen(QWidget):
         test_action_row = QHBoxLayout()
         test_action_row.setSpacing(14)
 
-        self.test_print_btn = QPushButton("🖨️ Send Test Print Receipt")
+        self.test_print_btn = QPushButton("Send Test Print Receipt")
         self.test_print_btn.setFixedHeight(40)
         self.test_print_btn.setStyleSheet("""
             QPushButton {
@@ -600,6 +603,7 @@ class SettingsScreen(QWidget):
             }
         """)
         self.test_print_btn.clicked.connect(self.handle_test_print)
+        set_btn_icon(self.test_print_btn, ICON_PRINTER, size=14, color='#FFFFFF')
         test_action_row.addWidget(self.test_print_btn)
 
         self.test_status_label = QLabel("Ready to test")
@@ -609,7 +613,7 @@ class SettingsScreen(QWidget):
         test_layout.addLayout(test_action_row)
 
         # Connection hints box
-        hint_box = self._make_tip_box("💡 Setup Tips & Troubleshooting:", [
+        hint_box = self._make_tip_box("Setup Tips & Troubleshooting:", [
             "• USB Connection: Ensure Windows displays your printer under 'Printers & Scanners'.",
             "• Paper Roll: Thermal paper must face the thermal print head (coated heat-sensitive side).",
             "• Network/LAN: Configure as Windows shared printer or standard TCP/IP port.",
@@ -707,7 +711,7 @@ class SettingsScreen(QWidget):
         calc_layout = QVBoxLayout(calc_box)
         calc_layout.setSpacing(8)
 
-        calc_title = QLabel("🧮 Live Counter Rate Calculator Test")
+        calc_title = QLabel("Live Counter Rate Calculator Test")
         calc_title.setStyleSheet("font-size: 12px; font-weight: 700; color: #0F172A;")
         calc_layout.addWidget(calc_title)
 
@@ -744,7 +748,7 @@ class SettingsScreen(QWidget):
         wa_layout = QVBoxLayout(wa_card)
         wa_layout.setSpacing(12)
 
-        wa_title = QLabel("📱 WhatsApp Direct Messaging")
+        wa_title = QLabel("WhatsApp Direct Messaging")
         wa_title.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
         wa_layout.addWidget(wa_title)
 
@@ -785,7 +789,7 @@ class SettingsScreen(QWidget):
 
         # Chat Top Bar
         chat_top = QHBoxLayout()
-        wa_icon = QLabel("💬")
+        wa_icon = QLabel("[WA]")
         chat_top.addWidget(wa_icon)
         chat_contact = QLabel("John Doe (Customer)")
         chat_contact.setStyleSheet("font-size: 12px; font-weight: 700; color: #075E54;")
@@ -853,12 +857,13 @@ class SettingsScreen(QWidget):
         grid = QGridLayout()
         grid.setSpacing(10)
 
-        def make_stat_box(title: str, val: str, icon: str = "ℹ️"):
+        def make_stat_box(title: str, val: str, icon: str = ""):
             frame = QFrame()
             frame.setObjectName("statBox")
             fl = QVBoxLayout(frame)
             fl.setSpacing(4)
-            lbl_title = QLabel(f"{icon} {title}")
+            prefix = f"{icon} " if icon else ""
+            lbl_title = QLabel(f"{prefix}{title}")
             lbl_title.setStyleSheet("font-size: 11px; font-weight: 600; color: #64748B;")
             lbl_val = QLabel(val)
             lbl_val.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
@@ -875,10 +880,10 @@ class SettingsScreen(QWidget):
             else:
                 db_size_str = f"{sz / (1024 * 1024):.2f} MB"
 
-        grid.addWidget(make_stat_box("Application Version", "v2.4.0 Commercial", "🚀"), 0, 0)
-        grid.addWidget(make_stat_box("Database Engine", "SQLite 3 (WAL)", "💾"), 0, 1)
-        grid.addWidget(make_stat_box("Database Storage", f"{db_size_str}", "📂"), 1, 0)
-        grid.addWidget(make_stat_box("Connection Status", "🟢 Online & Operational", "🛡️"), 1, 1)
+        grid.addWidget(make_stat_box("Application Version", "v2.4.0 Commercial", ""), 0, 0)
+        grid.addWidget(make_stat_box("Database Engine", "SQLite 3 (WAL)", ""), 0, 1)
+        grid.addWidget(make_stat_box("Database Storage", f"{db_size_str}", ""), 1, 0)
+        grid.addWidget(make_stat_box("Connection Status", "Online & Operational", ""), 1, 1)
 
         info_layout.addLayout(grid)
         left_col.addWidget(info_card)
@@ -912,10 +917,10 @@ class SettingsScreen(QWidget):
         except Exception:
             pass
 
-        m_grid.addWidget(make_stat_box("Active Catalog Parts", parts_cnt, "📦"), 0, 0)
-        m_grid.addWidget(make_stat_box("Registered Customers", cust_cnt, "👥"), 0, 1)
-        m_grid.addWidget(make_stat_box("System Operators", users_cnt, "🔑"), 1, 0)
-        m_grid.addWidget(make_stat_box("Architecture", "64-Bit Local Embedded", "⚡"), 1, 1)
+        m_grid.addWidget(make_stat_box("Active Catalog Parts", parts_cnt, ""), 0, 0)
+        m_grid.addWidget(make_stat_box("Registered Customers", cust_cnt, ""), 0, 1)
+        m_grid.addWidget(make_stat_box("System Operators", users_cnt, ""), 1, 0)
+        m_grid.addWidget(make_stat_box("Architecture", "64-Bit Local Embedded", ""), 1, 1)
 
         metrics_layout.addLayout(m_grid)
         left_col.addWidget(metrics_card)
@@ -946,7 +951,7 @@ class SettingsScreen(QWidget):
         # Health check action
         diag_row = QHBoxLayout()
         diag_row.setSpacing(12)
-        diag_btn = QPushButton("🔍 Run Health Check")
+        diag_btn = QPushButton("Run Health Check")
         diag_btn.setFixedHeight(36)
         diag_btn.setStyleSheet("""
             QPushButton {
@@ -963,6 +968,7 @@ class SettingsScreen(QWidget):
             }
         """)
         diag_btn.clicked.connect(self._run_db_integrity_check)
+        set_btn_icon(diag_btn, ICON_SEARCH, size=14, color='#475569')
         diag_row.addWidget(diag_btn)
 
         self.db_status_label = QLabel("Click to verify tables")
@@ -973,7 +979,7 @@ class SettingsScreen(QWidget):
         # 1-Click Backup Action
         backup_row = QHBoxLayout()
         backup_row.setSpacing(12)
-        backup_btn = QPushButton("💾 1-Click DB Backup")
+        backup_btn = QPushButton("1-Click DB Backup")
         backup_btn.setFixedHeight(36)
         backup_btn.setStyleSheet("""
             QPushButton {
@@ -990,6 +996,7 @@ class SettingsScreen(QWidget):
             }
         """)
         backup_btn.clicked.connect(self._create_instant_backup)
+        set_btn_icon(backup_btn, ICON_DOWNLOAD, size=14, color='#047857')
         backup_row.addWidget(backup_btn)
 
         self.backup_status_label = QLabel("Saved to /backups folder")
@@ -998,7 +1005,7 @@ class SettingsScreen(QWidget):
         maint_layout.addLayout(backup_row)
 
         # Security notes box
-        sec_box = self._make_tip_box("🛡️ Data Protection & Security:", [
+        sec_box = self._make_tip_box("Data Protection & Security:", [
             "• Local Sovereignty: Your database resides entirely on your premise without cloud lock-in.",
             "• WAL Mode: SQLite Write-Ahead Logging protects against power-cut corruption.",
             "• Automated Backups: You can copy the /backups folder to an external USB flash drive anytime."
@@ -1062,7 +1069,7 @@ class SettingsScreen(QWidget):
         bar_layout.addWidget(self.discard_btn)
 
         # Save button
-        self.save_btn = QPushButton("💾 Save All Settings")
+        self.save_btn = QPushButton("Save All Settings")
         self.save_btn.setFixedHeight(36)
         self.save_btn.setStyleSheet(f"""
             QPushButton {{
@@ -1082,6 +1089,7 @@ class SettingsScreen(QWidget):
             }}
         """)
         self.save_btn.clicked.connect(self.save_settings)
+        set_btn_icon(self.save_btn, ICON_SAVE, size=14, color='#FFFFFF')
         bar_layout.addWidget(self.save_btn)
 
         return bar
@@ -1140,7 +1148,7 @@ class SettingsScreen(QWidget):
         self._mark_dirty()
         printer_name = self.printer_combo.currentData()
         if printer_name:
-            self.printer_status_pill.setText(f"🟢 Configured: {printer_name}")
+            self.printer_status_pill.setText(f"Configured: {printer_name}")
             self.printer_status_pill.setStyleSheet("""
                 background-color: #DCFCE7;
                 color: #15803D;
@@ -1150,7 +1158,7 @@ class SettingsScreen(QWidget):
                 border-radius: 4px;
             """)
         else:
-            self.printer_status_pill.setText("⚪ No printer selected (defaulting to standard printing)")
+            self.printer_status_pill.setText("No printer selected (defaulting to standard printing)")
             self.printer_status_pill.setStyleSheet("""
                 background-color: #F1F5F9;
                 color: #64748B;

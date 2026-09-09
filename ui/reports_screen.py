@@ -25,7 +25,7 @@ from ui.theme import (
     MetricStatCard, StockBadgeDelegate,
     COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
     COLOR_PRIMARY_ORANGE, ScreenHeader, ICON_REPORTS, COLOR_SUCCESS,
-    PlusMinusSpinBox
+    PlusMinusSpinBox, set_btn_icon, ICON_WHATSAPP, ICON_REFRESH
 )
 
 class ReportsScreen(QWidget):
@@ -622,9 +622,10 @@ class ReportsScreen(QWidget):
         self.aging_combo.setCurrentIndex(1)
         self.aging_combo.currentIndexChanged.connect(self.load_diagnostic_matrix)
 
-        refresh_matrix_btn = QPushButton("⟳ Run Diagnostic")
+        refresh_matrix_btn = QPushButton("Run Diagnostic")
         refresh_matrix_btn.setFixedHeight(30)
         refresh_matrix_btn.clicked.connect(self.load_diagnostic_matrix)
+        set_btn_icon(refresh_matrix_btn, ICON_REFRESH, size=13, color='#475569')
 
         controls.addWidget(c_label)
         controls.addWidget(self.aging_combo)
@@ -717,7 +718,7 @@ class ReportsScreen(QWidget):
             self.credit_risk_table.setItem(row, 6, amt_item)
 
             # WhatsApp action button
-            wa_btn = QPushButton("📲 WhatsApp")
+            wa_btn = QPushButton("WhatsApp")
             wa_btn.setFixedHeight(26)
             wa_btn.setStyleSheet("""
                 QPushButton {
@@ -733,6 +734,7 @@ class ReportsScreen(QWidget):
                 }
             """)
             wa_btn.clicked.connect(lambda checked, o=ord_data: self._send_diag_whatsapp(o))
+            set_btn_icon(wa_btn, ICON_WHATSAPP, size=13, color='#166534')
             self.credit_risk_table.setCellWidget(row, 7, wa_btn)
 
         # 3. Stockout Friction Matrix

@@ -31,7 +31,8 @@ from utils.po_export import generate_po_pdf
 from ui.theme import (
     MetricStatCard, create_orange_button, StockBadgeDelegate,
     COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
-    COLOR_PRIMARY_ORANGE, COLOR_SUCCESS, ScreenHeader, ICON_SUPPLIERS, COLOR_WARNING
+    COLOR_PRIMARY_ORANGE, COLOR_SUCCESS, ScreenHeader, ICON_SUPPLIERS, COLOR_WARNING,
+    set_btn_icon, ICON_PDF, ICON_ZAPPER, ICON_DOWNLOAD
 )
 
 
@@ -169,7 +170,7 @@ class ViewPOItemsDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        export_btn = QPushButton("📄  Export PO PDF")
+        export_btn = QPushButton("Export PO PDF")
         export_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: #FFFFFF;
@@ -184,6 +185,7 @@ class ViewPOItemsDialog(QDialog):
             }}
         """)
         export_btn.clicked.connect(self._export_pdf)
+        set_btn_icon(export_btn, ICON_PDF, size=14, color=COLOR_PRIMARY_ORANGE)
         btn_layout.addWidget(export_btn)
 
         close_btn = QPushButton("Close")
@@ -265,7 +267,7 @@ class AddPODialog(QDialog):
 
         item_hdr_row.addStretch()
 
-        autofill_btn = QPushButton("⚡  Auto-Fill Low Stock Parts")
+        autofill_btn = QPushButton("Auto-Fill Low Stock Parts")
         autofill_btn.setStyleSheet("""
             QPushButton {
                 background-color: #FEF3C7;
@@ -281,12 +283,13 @@ class AddPODialog(QDialog):
             }
         """)
         autofill_btn.clicked.connect(self._autofill_low_stock)
+        set_btn_icon(autofill_btn, ICON_ZAPPER, size=13, color='#B45309')
         item_hdr_row.addWidget(autofill_btn)
         item_layout.addLayout(item_hdr_row)
 
         # Search Bar
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍  Type part number (e.g. BP001), name, brand, vehicle to search...")
+        self.search_input.setPlaceholderText("Search by part number, name, brand, or vehicle...")
         self.search_input.textChanged.connect(self._on_search_text_changed)
         item_layout.addWidget(self.search_input)
 
@@ -626,7 +629,7 @@ class SuppliersScreen(QWidget):
         bottom_bar.addWidget(po_heading)
         bottom_bar.addStretch()
 
-        self.reorder_low_btn = QPushButton("⚡  Auto-Order Low Stock")
+        self.reorder_low_btn = QPushButton("Auto-Order Low Stock")
         self.reorder_low_btn.setStyleSheet("""
             QPushButton {
                 background-color: #FEF3C7;
@@ -642,6 +645,7 @@ class SuppliersScreen(QWidget):
             }
         """)
         self.reorder_low_btn.clicked.connect(self.open_auto_reorder_po)
+        set_btn_icon(self.reorder_low_btn, ICON_ZAPPER, size=14, color='#B45309')
         bottom_bar.addWidget(self.reorder_low_btn)
 
         self.add_po_btn = QPushButton("+ Draft New PO")
@@ -808,8 +812,7 @@ class SuppliersScreen(QWidget):
             view_btn.clicked.connect(lambda checked, p_id=po.po_id: self.open_view_po(p_id))
             action_layout.addWidget(view_btn)
 
-            # 2. PDF Button
-            pdf_btn = QPushButton("📄 PDF")
+            pdf_btn = QPushButton("PDF")
             pdf_btn.setFixedHeight(28)
             pdf_btn.setCursor(Qt.PointingHandCursor)
             pdf_btn.setStyleSheet("""
@@ -829,11 +832,11 @@ class SuppliersScreen(QWidget):
                 }
             """)
             pdf_btn.clicked.connect(lambda checked, p_id=po.po_id: self.export_po_pdf_action(p_id))
+            set_btn_icon(pdf_btn, ICON_PDF, size=13, color='#475569')
             action_layout.addWidget(pdf_btn)
 
-            # 3. Receive & Stock In button (if not already received)
             if po.status != "Received":
-                receive_btn = QPushButton("📥 Receive & Stock In")
+                receive_btn = QPushButton("Receive & Stock In")
                 receive_btn.setFixedHeight(28)
                 receive_btn.setCursor(Qt.PointingHandCursor)
                 receive_btn.setStyleSheet("""
@@ -852,6 +855,7 @@ class SuppliersScreen(QWidget):
                     }
                 """)
                 receive_btn.clicked.connect(lambda checked, p_id=po.po_id: self.receive_po_action(p_id))
+                set_btn_icon(receive_btn, ICON_DOWNLOAD, size=13, color='#15803D')
                 action_layout.addWidget(receive_btn)
 
             self.po_table.setCellWidget(row, 5, action_widget)

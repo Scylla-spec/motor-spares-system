@@ -218,8 +218,26 @@ def _format_supermarket_text(
     for fline in footer_text.split("\n"):
         if fline.strip():
             lines.append(center(fline.strip()))
+
+    wa_msg = settings.get("whatsapp_message", "").strip()
+    if wa_msg:
+        lines.append(divider("-"))
+        # Word-wrap to width
+        words = wa_msg.split()
+        cur_line = ""
+        for word in words:
+            if len(cur_line) + len(word) + 1 <= w:
+                cur_line = (cur_line + " " + word).strip()
+            else:
+                lines.append(center(cur_line))
+                cur_line = word
+        if cur_line:
+            lines.append(center(cur_line))
+
+    lines.append(divider("-"))
     lines.append(center("Goods once sold cannot be refunded"))
     lines.append(center("without this receipt."))
+    lines.append(center("Powered by IrrefutableAccord"))
 
     return "\n".join(lines) + "\n"
 
@@ -337,8 +355,25 @@ def build_escpos_bytes(
     for fline in footer_text.split("\n"):
         if fline.strip():
             b.extend(fline.strip().encode("ascii", errors="replace") + b"\n")
+
+    wa_msg = settings.get("whatsapp_message", "").strip()
+    if wa_msg:
+        b.extend(divider_b("-"))
+        words = wa_msg.split()
+        cur_line = ""
+        for word in words:
+            if len(cur_line) + len(word) + 1 <= w:
+                cur_line = (cur_line + " " + word).strip()
+            else:
+                b.extend(cur_line.encode("ascii", errors="replace") + b"\n")
+                cur_line = word
+        if cur_line:
+            b.extend(cur_line.encode("ascii", errors="replace") + b"\n")
+
+    b.extend(divider_b("-"))
     b.extend(b"Goods once sold cannot be refunded\n")
     b.extend(b"without this receipt.\n")
+    b.extend(b"Powered by IrrefutableAccord\n")
 
     # Paper Feed & Cut
     if cut_paper:

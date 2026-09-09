@@ -25,7 +25,8 @@ from managers.inventory_manager import get_all_parts
 from ui.theme import (
     MetricStatCard, create_orange_button, StockBadgeDelegate,
     COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
-    COLOR_PRIMARY_ORANGE, ScreenHeader, ICON_CREDIT, COLOR_SUCCESS
+    COLOR_PRIMARY_ORANGE, ScreenHeader, ICON_CREDIT, COLOR_SUCCESS,
+    set_btn_icon, ICON_WHATSAPP
 )
 
 
@@ -174,7 +175,7 @@ class RecordCreditSaleDialog(QDialog):
 
         # Search Bar
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍  Type part number (e.g. AC3032), name, vehicle, or brand to search...")
+        self.search_input.setPlaceholderText("Search by part number, name, or vehicle...")
         self.search_input.textChanged.connect(self._on_search_text_changed)
         self.search_input.returnPressed.connect(self._on_search_return_pressed)
         item_layout.addWidget(self.search_input)
@@ -647,7 +648,7 @@ class CreditScreen(QWidget):
             pay_btn.clicked.connect(lambda checked, ord=o: self.settle_order(ord))
             action_layout.addWidget(pay_btn)
 
-            wa_btn = QPushButton("📲 WhatsApp")
+            wa_btn = QPushButton("WhatsApp")
             wa_btn.setFixedHeight(28)
             wa_btn.setMinimumWidth(85)
             wa_btn.setCursor(Qt.PointingHandCursor)
@@ -668,6 +669,7 @@ class CreditScreen(QWidget):
                 }
             """)
             wa_btn.clicked.connect(lambda checked, ord=o: self.send_whatsapp_reminder(ord))
+            set_btn_icon(wa_btn, ICON_WHATSAPP, size=13, color='#166534')
             action_layout.addWidget(wa_btn)
 
             self.pending_table.setCellWidget(row, 7, action_widget)

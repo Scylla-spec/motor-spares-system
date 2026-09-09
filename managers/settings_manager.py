@@ -10,6 +10,10 @@ DEFAULTS = {
     "address": "123 Auto Lane, Bulawayo, Zimbabwe",
     "phone": "+263 77 123 4567",
     "receipt_footer": "Thank you for your business!",
+    "whatsapp_message": (
+        "Thank you for your purchase! We appreciate your business. "
+        "For queries, please reply to this message or call us."
+    ),
     "logo_path": "",
     "thermal_printer_name": "",
     "thermal_paper_width": "80",

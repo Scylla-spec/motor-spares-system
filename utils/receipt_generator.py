@@ -95,8 +95,29 @@ def generate_pdf_receipt(sale: Sale, receipt_number: str, cashier_name: str, cus
         
         # Footer
         c.setFont("Helvetica-Oblique", 10)
-        c.drawCentredString(width / 2.0, 50, settings.get("receipt_footer") or "Thank you for your business!")
-        
+        footer = settings.get("receipt_footer") or "Thank you for your business!"
+        c.drawCentredString(width / 2.0, 65, footer)
+
+        wa_msg = settings.get("whatsapp_message", "").strip()
+        if wa_msg:
+            c.setFont("Helvetica", 8)
+            # Wrap long message across up to 2 lines
+            mid = len(wa_msg) // 2
+            split_at = wa_msg.rfind(" ", 0, mid + 20) or mid
+            line1 = wa_msg[:split_at].strip()
+            line2 = wa_msg[split_at:].strip()
+            c.drawCentredString(width / 2.0, 48, line1)
+            if line2:
+                c.drawCentredString(width / 2.0, 36, line2)
+
+        # Legal / Branding bar
+        c.setFont("Helvetica", 7)
+        c.setFillColorRGB(0.5, 0.5, 0.5)
+        c.drawCentredString(width / 2.0, 22,
+            "Goods once sold are non-refundable without this receipt.")
+        c.drawCentredString(width / 2.0, 12,
+            "Software by IrrefutableAccord | (c) 2025 All Rights Reserved")
+
         c.save()
         logging.info(f"Receipt {receipt_number} generated successfully at {filepath}")
         return os.path.abspath(filepath)

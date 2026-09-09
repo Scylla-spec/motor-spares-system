@@ -29,7 +29,8 @@ from utils.whatsapp_helper import build_pos_receipt_message, open_whatsapp_chat
 from ui.theme import (
     MetricStatCard, StockBadgeDelegate, create_primary_action_button,
     create_orange_button, COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
-    COLOR_PRIMARY_ORANGE, PlusMinusSpinBox, ScreenHeader, ICON_POS, QuantityStepper
+    COLOR_PRIMARY_ORANGE, PlusMinusSpinBox, ScreenHeader, ICON_POS, QuantityStepper,
+    set_btn_icon, ICON_TRASH, ICON_REFRESH, ICON_WHATSAPP
 )
 
 
@@ -73,7 +74,7 @@ class POSScreen(QWidget):
         catalog_header_row.addWidget(left_header)
         catalog_header_row.addStretch()
 
-        self.refresh_btn = QPushButton("⟳ Refresh")
+        self.refresh_btn = QPushButton("Refresh")
         self.refresh_btn.setFixedHeight(28)
         self.refresh_btn.setCursor(Qt.PointingHandCursor)
         self.refresh_btn.setToolTip("Reload parts from inventory (picks up newly stocked items)")
@@ -96,6 +97,7 @@ class POSScreen(QWidget):
             }}
         """)
         self.refresh_btn.clicked.connect(self.refresh_catalog)
+        set_btn_icon(self.refresh_btn, ICON_REFRESH, size=14, color='#475569')
         catalog_header_row.addWidget(self.refresh_btn)
         left_layout.addLayout(catalog_header_row)
 
@@ -177,7 +179,7 @@ class POSScreen(QWidget):
         card_layout.addWidget(self.total_label)
 
         # Multi-currency live equivalent chips
-        self.currency_chips_label = QLabel("≈ 0.00 ZiG  |  ≈ R 0.00")
+        self.currency_chips_label = QLabel("~ 0.00 ZiG  |  ~ R 0.00")
         self.currency_chips_label.setAlignment(Qt.AlignRight)
         self.currency_chips_label.setStyleSheet("""
             font-size: 12px;
@@ -409,8 +411,8 @@ class POSScreen(QWidget):
                 del_layout.setContentsMargins(2, 2, 2, 2)
                 del_layout.setAlignment(Qt.AlignCenter)
 
-                remove_btn = QPushButton("🗑")
-                remove_btn.setToolTip("Delete from cart")
+                remove_btn = QPushButton()
+                remove_btn.setToolTip("Remove from cart")
                 remove_btn.setFixedSize(30, 28)
                 remove_btn.setCursor(Qt.PointingHandCursor)
                 remove_btn.setStyleSheet("""
@@ -428,6 +430,7 @@ class POSScreen(QWidget):
                     }
                 """)
                 remove_btn.clicked.connect(lambda checked, pid=part_id: self.remove_from_cart(pid))
+                set_btn_icon(remove_btn, ICON_TRASH, size=14, color='#DC2626')
                 del_layout.addWidget(remove_btn)
                 self.cart_table.setCellWidget(row, 4, del_widget)
 
@@ -441,14 +444,14 @@ class POSScreen(QWidget):
         total_amount = sum(i.subtotal for i in self.cart_items.values())
         equiv = get_all_currency_equivalents(total_amount)
         self.total_label.setText(f"Total: ${total_amount:.2f}")
-        self.currency_chips_label.setText(f"≈ {equiv['ZIG']}   |   ≈ {equiv['ZAR']}")
+        self.currency_chips_label.setText(f"~ {equiv['ZIG']}   |   ~ {equiv['ZAR']}")
 
     def refresh_catalog(self):
         """Reload the full part catalog from the database (picks up newly stocked items)."""
-        self.refresh_btn.setText("⟳ Refreshing...")
+        self.refresh_btn.setText("Refreshing...")
         self.refresh_btn.setEnabled(False)
         self.perform_search(self.search_input.text())
-        self.refresh_btn.setText("⟳ Refresh")
+        self.refresh_btn.setText("Refresh")
         self.refresh_btn.setEnabled(True)
 
     def change_cart_qty(self, part_id, new_qty):
@@ -583,7 +586,7 @@ class POSScreen(QWidget):
                 f"Payment Method: <b>{payment_method}</b><br><br>"
                 f"{prt_info}"
             )
-            wa_receipt_btn = msg_box.addButton("📲 Send WhatsApp Receipt", QMessageBox.ActionRole)
+            wa_receipt_btn = msg_box.addButton("Send WhatsApp Receipt", QMessageBox.ActionRole)
             ok_btn = msg_box.addButton("Done", QMessageBox.AcceptRole)
             msg_box.setDefaultButton(ok_btn)
 

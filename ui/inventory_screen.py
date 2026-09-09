@@ -30,7 +30,8 @@ from utils.validators import validate_part
 from ui.theme import (
     MetricStatCard, StockBadgeDelegate, create_primary_action_button,
     COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE,
-    PlusMinusSpinBox, ScreenHeader, ICON_INVENTORY
+    PlusMinusSpinBox, ScreenHeader, ICON_INVENTORY,
+    set_btn_icon, ICON_TRASH
 )
 
 
@@ -781,7 +782,7 @@ class InventoryScreen(QWidget):
                 action_layout.addWidget(adjust_btn)
 
                 if self.current_user.is_admin():
-                    del_btn = QPushButton("🗑 Delete")
+                    del_btn = QPushButton("Delete")
                     del_btn.setFixedHeight(28)
                     del_btn.setMinimumWidth(76)
                     del_btn.setCursor(Qt.PointingHandCursor)
@@ -801,6 +802,7 @@ class InventoryScreen(QWidget):
                         }
                     """)
                     del_btn.clicked.connect(lambda checked, p=part: self.delete_part_action(p))
+                    set_btn_icon(del_btn, ICON_TRASH, size=13, color='#DC2626')
                     action_layout.addWidget(del_btn)
 
                 self.table.setCellWidget(row, 7, action_widget)
