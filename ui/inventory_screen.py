@@ -477,16 +477,28 @@ class InventoryScreen(QWidget):
         toolbar_layout.addWidget(self.add_part_btn)
 
         self.export_csv_btn = QPushButton("Export CSV")
-        self.export_csv_btn.setToolTip("Export currently displayed parts to CSV file")
-        self.export_csv_btn.clicked.connect(self.export_to_csv)
+        self.export_csv_btn.setToolTip("Export currently displayed parts to CSV file (Admin only)")
+        if self.current_user.is_admin():
+            self.export_csv_btn.clicked.connect(self.export_to_csv)
+        else:
+            self.export_csv_btn.setEnabled(False)
+            self.export_csv_btn.setToolTip("Admin access required to export inventory data")
         toolbar_layout.addWidget(self.export_csv_btn)
 
         self.import_excel_btn = QPushButton("Import Excel")
-        self.import_excel_btn.clicked.connect(self.open_excel_import)
+        if self.current_user.is_admin():
+            self.import_excel_btn.clicked.connect(self.open_excel_import)
+        else:
+            self.import_excel_btn.setEnabled(False)
+            self.import_excel_btn.setToolTip("Admin access required to import inventory data")
         toolbar_layout.addWidget(self.import_excel_btn)
 
         self.import_image_btn = QPushButton("Import Photo")
-        self.import_image_btn.clicked.connect(self.open_image_import)
+        if self.current_user.is_admin():
+            self.import_image_btn.clicked.connect(self.open_image_import)
+        else:
+            self.import_image_btn.setEnabled(False)
+            self.import_image_btn.setToolTip("Admin access required to import inventory data")
         toolbar_layout.addWidget(self.import_image_btn)
 
         layout.addLayout(toolbar_layout)
@@ -759,27 +771,28 @@ class InventoryScreen(QWidget):
                 stock_in_btn.clicked.connect(lambda checked, p=part: self.open_stock_in_dialog(p))
                 action_layout.addWidget(stock_in_btn)
 
-                adjust_btn = QPushButton("Adjust")
-                adjust_btn.setFixedHeight(28)
-                adjust_btn.setMinimumWidth(60)
-                adjust_btn.setCursor(Qt.PointingHandCursor)
-                adjust_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #FFFFFF;
-                        color: #475569;
-                        border: 1px solid #CBD5E1;
-                        border-radius: 4px;
-                        font-weight: 600;
-                        font-size: 12px;
-                        padding: 2px 8px;
-                    }
-                    QPushButton:hover {
-                        background-color: #F8FAFC;
-                        border-color: #94A3B8;
-                    }
-                """)
-                adjust_btn.clicked.connect(lambda checked, p=part: self.open_adjust_dialog(p))
-                action_layout.addWidget(adjust_btn)
+                if self.current_user.is_admin():
+                    adjust_btn = QPushButton("Adjust")
+                    adjust_btn.setFixedHeight(28)
+                    adjust_btn.setMinimumWidth(60)
+                    adjust_btn.setCursor(Qt.PointingHandCursor)
+                    adjust_btn.setStyleSheet("""
+                        QPushButton {
+                            background-color: #FFFFFF;
+                            color: #475569;
+                            border: 1px solid #CBD5E1;
+                            border-radius: 4px;
+                            font-weight: 600;
+                            font-size: 12px;
+                            padding: 2px 8px;
+                        }
+                        QPushButton:hover {
+                            background-color: #F8FAFC;
+                            border-color: #94A3B8;
+                        }
+                    """)
+                    adjust_btn.clicked.connect(lambda checked, p=part: self.open_adjust_dialog(p))
+                    action_layout.addWidget(adjust_btn)
 
                 if self.current_user.is_admin():
                     del_btn = QPushButton("Delete")

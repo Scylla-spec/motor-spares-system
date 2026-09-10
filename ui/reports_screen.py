@@ -346,7 +346,11 @@ class ReportsScreen(QWidget):
                 background-color: #EA580C;
             }}
         """)
-        export_btn.clicked.connect(self.export_reorder_list)
+        if self.current_user.is_admin():
+            export_btn.clicked.connect(self.export_reorder_list)
+        else:
+            export_btn.setEnabled(False)
+            export_btn.setToolTip("Admin access required to export reports")
         top_bar.addWidget(export_btn)
 
         top_bar.addStretch()

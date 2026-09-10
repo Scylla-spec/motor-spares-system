@@ -626,27 +626,28 @@ class CreditScreen(QWidget):
             view_btn.clicked.connect(lambda checked, ord=o: self.view_items(ord))
             action_layout.addWidget(view_btn)
 
-            pay_btn = QPushButton("Mark Paid")
-            pay_btn.setFixedHeight(28)
-            pay_btn.setMinimumWidth(75)
-            pay_btn.setCursor(Qt.PointingHandCursor)
-            pay_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #FFFFFF;
-                    color: #15803D;
-                    border: 1px solid #86EFAC;
-                    border-radius: 4px;
-                    font-weight: 600;
-                    font-size: 12px;
-                    padding: 2px 8px;
-                }
-                QPushButton:hover {
-                    background-color: #F0FDF4;
-                    border-color: #4ADE80;
-                }
-            """)
-            pay_btn.clicked.connect(lambda checked, ord=o: self.settle_order(ord))
-            action_layout.addWidget(pay_btn)
+            if self.current_user.is_admin():
+                pay_btn = QPushButton("Mark Paid")
+                pay_btn.setFixedHeight(28)
+                pay_btn.setMinimumWidth(75)
+                pay_btn.setCursor(Qt.PointingHandCursor)
+                pay_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #FFFFFF;
+                        color: #15803D;
+                        border: 1px solid #86EFAC;
+                        border-radius: 4px;
+                        font-weight: 600;
+                        font-size: 12px;
+                        padding: 2px 8px;
+                    }
+                    QPushButton:hover {
+                        background-color: #F0FDF4;
+                        border-color: #4ADE80;
+                    }
+                """)
+                pay_btn.clicked.connect(lambda checked, ord=o: self.settle_order(ord))
+                action_layout.addWidget(pay_btn)
 
             wa_btn = QPushButton("WhatsApp")
             wa_btn.setFixedHeight(28)
