@@ -111,17 +111,38 @@ cd motor_spares_system
 pip install -r requirements.txt
 ```
 
-### 4. Launch the Application
+### 4. (Optional) Setup Tesseract OCR for Photo Invoice Ingestion
+The system features an optional image-based stock intake module to digitize printed supplier invoices and price lists from photos or scans.
+- **Windows**: Install via `winget install UB-Mannheim.TesseractOCR` or download the installer from [UB-Mannheim GitHub](https://github.com/UB-Mannheim/tesseract/wiki).
+- **Linux (Ubuntu/Debian)**: `sudo apt install tesseract-ocr`
+- **macOS**: `brew install tesseract`
+
+*Note: If Tesseract is not installed, the rest of the application (POS, Inventory, Reports, Credit, Excel Importer) functions with 100% full capability. When opening the Photo Import dialog without Tesseract, the app presents a built-in installation guide with zero crash.*
+
+### 5. Launch the Application
 ```bash
 python main.py
 ```
 
-### 5. Default Credentials
+### 6. Default Credentials
 On first launch, the database is automatically created and seeded with default administrative credentials:
 - **Username**: `admin`
 - **Password**: `admin123`
 
 *(Note: Change this password immediately under **User Management** upon initial deployment).*
+
+---
+
+## 🔒 Architectural Decision: Why Offline-Only OCR?
+
+Many modern business solutions send captured invoices to cloud-hosted computer vision APIs (such as Google Cloud Document AI, AWS Textract, or Azure Vision). For **Motor Spares System**, we deliberately engineered the OCR engine to run **100% locally and offline** using Tesseract and OpenCV:
+
+1. **Absolute Privacy of Wholesale Dealer Margins & Costs**:
+   Motor spares retailers negotiate highly sensitive supplier discounts, wholesale pricing tiers, and proprietary dealer margins. Uploading invoices to third-party cloud servers exposes critical trade secrets and commercial data. Local execution ensures sensitive supplier pricing never leaves the premises.
+2. **Zero Recurring Operational Bills**:
+   Cloud vision APIs charge per processed page or API call. For an independent auto parts retailer ingesting multi-page invoices weekly, recurring API fees turn software into an ongoing liability. Offline OCR provides unlimited page extraction forever with zero marginal cost.
+3. **Resilience to Low/Intermittent Internet Connectivity**:
+   Automotive scrap yards, mechanics, and industrial spares warehouses frequently operate in industrial areas or regional hubs with intermittent power or unreliable cellular data. Our offline architecture guarantees that staff can unpack shipments and digitize inventory without waiting for an internet connection.
 
 ---
 
@@ -141,13 +162,13 @@ On first launch, the database is automatically created and seeded with default a
 
 ## 🧪 Running Automated Tests
 
-The application includes a comprehensive automated test suite covering authentication, stock deduction, credit handling, numbering sequences, and reports:
+The application includes a comprehensive automated test suite covering authentication, stock deduction, credit handling, numbering sequences, Tesseract cross-platform detection, and reports:
 
 ```bash
 python -m pytest tests -v
 ```
 
-All 42 test suites must pass before deploying or packaging.
+All 47 tests must pass before deploying or packaging.
 
 ---
 
@@ -166,6 +187,8 @@ The resulting standalone executable will be located in the `dist/` directory.
 
 ## 📖 Complete Documentation Suite
 
+- [**First-Run & Onboarding Guide**](docs/FIRST_RUN_GUIDE.md) — Step-by-step setup guide for new shop owners.
 - [**Cashier & User Operations Manual**](docs/USER_MANUAL.md) — Comprehensive guide on POS, Credit, Inventory, and PO workflows.
 - [**Hardware Compatibility Guide**](docs/HARDWARE_GUIDE.md) — Printer, scanner, and cash drawer setup.
 - [**Commercial Product Feature Sheet**](docs/COMMERCIAL_FEATURE_SHEET.md) — Feature breakdown and value proposition for sales presentations.
+- [**Software License**](LICENSE) — Commercial proprietary software license terms.
