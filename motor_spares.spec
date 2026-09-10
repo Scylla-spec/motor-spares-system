@@ -1,4 +1,4 @@
-﻿# -*- mode: python ; coding: utf-8 -*-
+# -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec for Motor Spares System
 # Run: pyinstaller motor_spares.spec
 
@@ -33,7 +33,6 @@ hidden_imports = [
 ]
 
 datas = [
-    ('database/motor_spares.db', 'database'),
     ('assets', 'assets'),
 ]
 
@@ -63,6 +62,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
+    icon='assets/icons/favicon.ico',
 )
 
 coll = COLLECT(

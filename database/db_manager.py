@@ -1,20 +1,72 @@
 import sqlite3
 import logging
 import os
+import sys
 
-# Ensure logs directory exists
-os.makedirs("logs", exist_ok=True)
+def get_app_data_dir() -> str:
+    """Returns the persistent, per-user writable application data directory.
+    
+    Priority:
+    1. MOTOR_SPARES_DATA_DIR environment variable (if explicitly set).
+    2. Frozen PyInstaller / Packaged app (sys.frozen == True):
+       - Windows: %APPDATA%/MotorSparesSystem
+       - macOS: ~/Library/Application Support/MotorSparesSystem
+       - Linux/Other: ~/.local/share/MotorSparesSystem
+    3. Source repository / Development mode:
+       - Uses local workspace 'database' directory if present, otherwise AppData.
+    """
+    if "MOTOR_SPARES_DATA_DIR" in os.environ:
+        path = os.environ["MOTOR_SPARES_DATA_DIR"]
+    elif getattr(sys, "frozen", False):
+        if sys.platform == "win32":
+            base = os.environ.get("APPDATA") or os.path.expanduser("~")
+            path = os.path.join(base, "MotorSparesSystem")
+        elif sys.platform == "darwin":
+            path = os.path.expanduser("~/Library/Application Support/MotorSparesSystem")
+        else:
+            path = os.path.expanduser("~/.local/share/MotorSparesSystem")
+    else:
+        # Development / source repository mode
+        workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        local_db_dir = os.path.join(workspace_root, "database")
+        if os.path.isdir(local_db_dir):
+            path = local_db_dir
+        else:
+            if sys.platform == "win32":
+                base = os.environ.get("APPDATA") or os.path.expanduser("~")
+                path = os.path.join(base, "MotorSparesSystem")
+            elif sys.platform == "darwin":
+                path = os.path.expanduser("~/Library/Application Support/MotorSparesSystem")
+            else:
+                path = os.path.expanduser("~/.local/share/MotorSparesSystem")
+
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+# Ensure logs directory exists in writable per-user directory
+if getattr(sys, "frozen", False):
+    LOGS_DIR = os.path.join(get_app_data_dir(), "logs")
+else:
+    workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    LOGS_DIR = os.path.join(workspace_root, "logs")
+
+os.makedirs(LOGS_DIR, exist_ok=True)
 logging.basicConfig(
-    filename="logs/app.log",
+    filename=os.path.join(LOGS_DIR, "app.log"),
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-DB_PATH = os.path.join("database", "motor_spares.db")
+# Canonical database path (absolute)
+DB_PATH = os.path.join(get_app_data_dir(), "motor_spares.db")
 
 
 def get_connection():
     """Establishes and returns a database connection with foreign keys enabled."""
+    db_dir = os.path.dirname(os.path.abspath(DB_PATH))
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.row_factory = sqlite3.Row  # Access columns by name
