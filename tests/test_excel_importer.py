@@ -18,4 +18,28 @@ def test_excel_importer_king_smurk():
     corrected = auto_correct_rows(raw_rows[:10])
     assert len(corrected) == 10
     assert corrected[0]["quantity_on_hand"] == 3
-    assert len(corrected[0]["_errors"]) == 0
+    # Rows with selling_price <= 0 are now flagged as errors
+    assert len(corrected[0]["_errors"]) == 1
+    assert "Selling price must be greater than 0" in corrected[0]["_errors"][0]
+
+
+def test_zero_selling_price_blocked(test_db):
+    row = {
+        "part_number": "TEST-001",
+        "name": "Test Part",
+        "category": "Engine",
+        "brand": "Toyota",
+        "cost_price": 10.0,
+        "selling_price": 0.0,
+        "quantity_on_hand": 5,
+        "reorder_level": 2,
+    }
+    corrected = auto_correct_rows([row])
+    assert len(corrected[0]["_errors"]) == 1
+    assert "Selling price must be greater than 0" in corrected[0]["_errors"][0]
+
+    # Verification: import_parts_from_rows skips rows with _errors / selling_price <= 0
+    res = import_parts_from_rows(corrected)
+    assert res["imported"] == 0
+    assert res["skipped"] == 1
+    assert len(res["errors"]) == 1

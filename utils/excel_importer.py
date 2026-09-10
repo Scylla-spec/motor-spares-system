@@ -336,10 +336,12 @@ def auto_correct_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         else:
             clean["supplier_id"] = None
 
-        # --- Errors: only truly unrecoverable issues ---
+        # --- Errors: unrecoverable issues that block import ---
         errors = []
         if clean.get("cost_price", 0) < 0:
             errors.append("Cost price cannot be negative.")
+        if clean.get("selling_price", 0) <= 0:
+            errors.append("Selling price must be greater than 0.")
 
         clean["_warnings"] = warnings
         clean["_corrections"] = corrections
@@ -398,6 +400,11 @@ def import_parts_from_rows(corrected: List[Dict[str, Any]], parse_warnings: List
     for i, row in enumerate(corrected, start=1):
         if row.get("_errors"):
             all_errors.append(f"Row {i} ({row.get('part_number','?')}): {'; '.join(row['_errors'])}")
+            skipped += 1
+            continue
+
+        if row.get("selling_price", 0.0) <= 0:
+            all_errors.append(f"Row {i} ({row.get('part_number','?')}): Selling price must be greater than 0 — skipped.")
             skipped += 1
             continue
 

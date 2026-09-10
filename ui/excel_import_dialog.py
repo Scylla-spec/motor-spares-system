@@ -284,6 +284,8 @@ class ExcelImportDialog(QDialog):
             errors = []
             if row.get("cost_price", 0) < 0:
                 errors.append("Cost price cannot be negative.")
+            if row.get("selling_price", 0) <= 0:
+                errors.append("Selling price must be greater than 0.")
             row["_errors"] = errors
 
             # Refresh warnings for still-missing fields
