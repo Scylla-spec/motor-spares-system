@@ -71,7 +71,6 @@ def initialize_database():
                 selling_price REAL NOT NULL CHECK(selling_price >= 0),
                 reorder_level INTEGER DEFAULT 0,
                 supplier_id INTEGER,
-                vehicle_type TEXT NOT NULL DEFAULT 'Car',
                 FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id) ON DELETE RESTRICT
             );
         """)
@@ -79,8 +78,6 @@ def initialize_database():
         # Search Indexes for Part
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_part_category ON Part(category);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_part_brand ON Part(brand);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_part_name ON Part(name);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_part_part_number ON Part(part_number);")
 
         # 5. StockMovement Table
         cursor.execute("""
@@ -258,32 +255,6 @@ def initialize_database():
         po_columns = {row[1] for row in cursor.fetchall()}
         if "po_number" not in po_columns:
             cursor.execute("ALTER TABLE PurchaseOrder ADD COLUMN po_number TEXT;")
-
-        # --- Migration: add voiding and status columns to Sale if missing ---
-        cursor.execute("PRAGMA table_info(Sale);")
-        sale_columns = {row[1] for row in cursor.fetchall()}
-        if "status" not in sale_columns:
-            cursor.execute("ALTER TABLE Sale ADD COLUMN status TEXT DEFAULT 'Completed';")
-        if "voided_by" not in sale_columns:
-            cursor.execute("ALTER TABLE Sale ADD COLUMN voided_by INTEGER;")
-        if "voided_reason" not in sale_columns:
-            cursor.execute("ALTER TABLE Sale ADD COLUMN voided_reason TEXT;")
-        if "voided_at" not in sale_columns:
-            cursor.execute("ALTER TABLE Sale ADD COLUMN voided_at TEXT;")
-
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_sale_status ON Sale(status);")
-
-        # --- Migration: add vehicle_type column to Part if missing ---
-        # Safe to re-run: checks first. All existing rows default to 'Car'.
-        cursor.execute("PRAGMA table_info(Part);")
-        part_columns = {row[1] for row in cursor.fetchall()}
-        if "vehicle_type" not in part_columns:
-            cursor.execute(
-                "ALTER TABLE Part ADD COLUMN vehicle_type TEXT NOT NULL DEFAULT 'Car';"
-            )
-            logging.info("Migration: added vehicle_type column to Part table.")
-
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_part_vehicle_type ON Part(vehicle_type);")
 
         conn.commit()
         logging.info("Database schema initialized successfully.")

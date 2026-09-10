@@ -93,14 +93,10 @@ class AddEditPartDialog(QDialog):
         for sup in self._suppliers:
             self.supplier_combo.addItem(sup.name, sup.supplier_id)
 
-        self.vehicle_type_combo = QComboBox()
-        self.vehicle_type_combo.addItems(["Car", "Motorbike", "Both"])
-
         form.addRow("Part Number *:", self.part_number)
         form.addRow("Name *:", self.name)
         form.addRow("Category:", self.category)
         form.addRow("Brand:", self.brand)
-        form.addRow("Vehicle Type:", self.vehicle_type_combo)
         form.addRow("Compatible Vehicles:", self.compatible_vehicles)
         form.addRow("Cost Price ($) *:", self.cost_price)
         form.addRow("Selling Price ($) *:", self.selling_price)
@@ -146,10 +142,6 @@ class AddEditPartDialog(QDialog):
         self.selling_price.setValue(self.part.selling_price)
         self.quantity_on_hand.setValue(self.part.quantity_on_hand)
         self.reorder_level.setValue(self.part.reorder_level)
-        if getattr(self.part, 'vehicle_type', None):
-            idx = self.vehicle_type_combo.findText(self.part.vehicle_type)
-            if idx >= 0:
-                self.vehicle_type_combo.setCurrentIndex(idx)
         if self.part.supplier_id is not None:
             idx = self.supplier_combo.findData(self.part.supplier_id)
             if idx >= 0:
@@ -177,8 +169,7 @@ class AddEditPartDialog(QDialog):
             cost_price=self.cost_price.value(),
             selling_price=self.selling_price.value(),
             reorder_level=self.reorder_level.value(),
-            supplier_id=self.supplier_combo.currentData(),
-            vehicle_type=self.vehicle_type_combo.currentText()
+            supplier_id=self.supplier_combo.currentData()
         )
         self.part = new_part
         self.accept()
@@ -459,16 +450,6 @@ class InventoryScreen(QWidget):
         self.brand_filter.currentIndexChanged.connect(self.apply_filters)
         toolbar_layout.addWidget(self.brand_filter)
 
-        # Vehicle Type Filter Dropdown
-        self.vehicle_filter = QComboBox()
-        self.vehicle_filter.addItem("All Vehicles", None)
-        self.vehicle_filter.addItem("Car", "Car")
-        self.vehicle_filter.addItem("Motorbike", "Motorbike")
-        self.vehicle_filter.addItem("Both", "Both")
-        self.vehicle_filter.setFixedWidth(130)
-        self.vehicle_filter.currentIndexChanged.connect(self.apply_filters)
-        toolbar_layout.addWidget(self.vehicle_filter)
-
         # Search Input
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Filter by SKU, name, or vehicle...")
@@ -526,9 +507,9 @@ class InventoryScreen(QWidget):
         # 3. Modern Data Table
         # -------------------------------------------------------------
         self.table = QTableWidget()
-        self.table.setColumnCount(9)
+        self.table.setColumnCount(8)
         self.table.setHorizontalHeaderLabels([
-            "#", "Part#", "Name", "Category", "Brand", "Type", "Price", "Stock", "Actions"
+            "#", "Part#", "Name", "Category", "Brand", "Price", "Stock", "Actions"
         ])
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -539,12 +520,11 @@ class InventoryScreen(QWidget):
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(7, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(8, QHeaderView.ResizeToContents)
         
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setItemDelegateForColumn(7, StockBadgeDelegate(self.table))
+        self.table.setItemDelegateForColumn(6, StockBadgeDelegate(self.table))
         self.table.verticalHeader().setDefaultSectionSize(40)
 
         layout.addWidget(self.table)
@@ -634,7 +614,6 @@ class InventoryScreen(QWidget):
         query = self.search_input.text().strip().lower()
         selected_cat = self.category_filter.currentData()
         selected_brand = self.brand_filter.currentData()
-        selected_vt = self.vehicle_filter.currentData()
 
         filtered = []
         for p in self.all_active_parts:
@@ -644,12 +623,9 @@ class InventoryScreen(QWidget):
             # Brand match
             if selected_brand and p.brand != selected_brand:
                 continue
-            # Vehicle type match
-            if selected_vt and getattr(p, 'vehicle_type', 'Car') != selected_vt:
-                continue
             # Search query match
             if query:
-                text_corpus = f"{p.part_number} {p.name} {p.brand} {p.category} {p.compatible_vehicles} {getattr(p, 'vehicle_type', '')}".lower()
+                text_corpus = f"{p.part_number} {p.name} {p.brand} {p.category} {p.compatible_vehicles}".lower()
                 if query not in text_corpus:
                     continue
             filtered.append(p)
@@ -734,20 +710,15 @@ class InventoryScreen(QWidget):
                 # 4: BRAND
                 self.table.setItem(row, 4, QTableWidgetItem(part.brand or "—"))
 
-                # 5: VEHICLE TYPE
-                vt_item = QTableWidgetItem(getattr(part, 'vehicle_type', 'Car'))
-                vt_item.setTextAlignment(Qt.AlignCenter)
-                self.table.setItem(row, 5, vt_item)
-
-                # 6: UNIT PRICE
+                # 5: UNIT PRICE
                 price_item = QTableWidgetItem(f"${part.selling_price:.2f}")
                 price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                self.table.setItem(row, 6, price_item)
+                self.table.setItem(row, 5, price_item)
 
-                # 7: STOCK (Rendered via StockBadgeDelegate on column 7)
+                # 6: STOCK (Rendered via StockBadgeDelegate on column 6)
                 stock_item = QTableWidgetItem(str(part.quantity_on_hand))
                 stock_item.setData(Qt.UserRole + 1, part.is_low_stock())
-                self.table.setItem(row, 7, stock_item)
+                self.table.setItem(row, 6, stock_item)
 
                 # 7: ACTIONS - Centered, professional, clean ERP styling
                 action_widget = QWidget()

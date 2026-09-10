@@ -109,41 +109,28 @@ class POSScreen(QWidget):
         catalog_header_row.addWidget(self.refresh_btn)
         left_layout.addLayout(catalog_header_row)
 
-        search_bar_layout = QHBoxLayout()
-        search_bar_layout.setSpacing(8)
-
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Scan barcode or search by part#, name, brand...")
         self.search_input.setFixedHeight(34)
         self.search_input.textChanged.connect(self._on_search_text_changed)
-        search_bar_layout.addWidget(self.search_input, 1)
-
-        self.vehicle_filter = QComboBox()
-        self.vehicle_filter.addItems(["All Vehicles", "Car", "Motorbike", "Both"])
-        self.vehicle_filter.setFixedHeight(34)
-        self.vehicle_filter.setToolTip("Filter catalog by vehicle type (Car / Motorbike / Both)")
-        self.vehicle_filter.currentIndexChanged.connect(self._fire_search)
-        search_bar_layout.addWidget(self.vehicle_filter)
-
-        left_layout.addLayout(search_bar_layout)
+        left_layout.addWidget(self.search_input)
 
         self.results_table = QTableWidget()
-        self.results_table.setColumnCount(7)
-        self.results_table.setHorizontalHeaderLabels(["#", "Part#", "Name", "Type", "Price", "Stock", "Action"])
+        self.results_table.setColumnCount(6)
+        self.results_table.setHorizontalHeaderLabels(["#", "Part#", "Name", "Price", "Stock", "Action"])
         header = self.results_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.Stretch)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(6, QHeaderView.Fixed)
-        self.results_table.setColumnWidth(6, 100)
+        header.setSectionResizeMode(5, QHeaderView.Fixed)
+        self.results_table.setColumnWidth(5, 100)
         self.results_table.verticalHeader().setVisible(False)
         self.results_table.verticalHeader().setDefaultSectionSize(44)
         self.results_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.results_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.results_table.setItemDelegateForColumn(5, StockBadgeDelegate(self.results_table))
+        self.results_table.setItemDelegateForColumn(4, StockBadgeDelegate(self.results_table))
         left_layout.addWidget(self.results_table)
 
         splitter.addWidget(left_widget)
@@ -308,15 +295,6 @@ class POSScreen(QWidget):
             results = search_parts(text_clean)
 
         active_results = [p for p in results if not p.name.startswith("[DEACTIVATED]")]
-        
-        # Vehicle Type filtering
-        selected_vt = self.vehicle_filter.currentText()
-        if selected_vt != "All Vehicles":
-            active_results = [
-                p for p in active_results 
-                if getattr(p, 'vehicle_type', 'Car') in (selected_vt, 'Both')
-            ]
-
         display_results = active_results[:150]
 
         self.results_table.setUpdatesEnabled(False)
@@ -339,19 +317,13 @@ class POSScreen(QWidget):
                 # 2: NAME
                 self.results_table.setItem(row, 2, QTableWidgetItem(part.name))
 
-                # 3: TYPE (Car / Motorbike / Both)
-                vt_item = QTableWidgetItem(getattr(part, 'vehicle_type', 'Car'))
-                vt_item.setTextAlignment(Qt.AlignCenter)
-                vt_item.setForeground(QColor("#475569"))
-                self.results_table.setItem(row, 3, vt_item)
+                # 3: PRICE
+                self.results_table.setItem(row, 3, QTableWidgetItem(f"${part.selling_price:.2f}"))
 
-                # 4: PRICE
-                self.results_table.setItem(row, 4, QTableWidgetItem(f"${part.selling_price:.2f}"))
-
-                # 5: STOCK (StockBadgeDelegate on Column 5)
+                # 4: STOCK (StockBadgeDelegate on Column 4)
                 stock_item = QTableWidgetItem(str(part.quantity_on_hand))
                 stock_item.setData(Qt.UserRole + 1, part.is_low_stock())
-                self.results_table.setItem(row, 5, stock_item)
+                self.results_table.setItem(row, 4, stock_item)
 
                 # 5: ACTION
                 add_widget = QWidget()
