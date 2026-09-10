@@ -352,11 +352,17 @@ class SettingsScreen(QWidget):
         preview_sub.setStyleSheet(f"font-size: 11px; color: {COLOR_TEXT_SECONDARY};")
         preview_layout.addWidget(preview_sub)
 
-        # The simulated paper ticket
+        # The simulated paper ticket — fixed 380px wide (≈ 80mm thermal paper)
+        # centred inside the preview panel via a wrapper row.
+        ticket_wrapper = QHBoxLayout()
+        ticket_wrapper.setContentsMargins(0, 0, 0, 0)
+
         self.ticket_frame = QFrame()
         self.ticket_frame.setObjectName("ticketFrame")
+        self.ticket_frame.setFixedWidth(380)
         ticket_layout = QVBoxLayout(self.ticket_frame)
         ticket_layout.setSpacing(4)
+        ticket_layout.setContentsMargins(16, 12, 16, 12)
         ticket_layout.setAlignment(Qt.AlignTop)
 
         # Logo / Name in ticket
@@ -434,7 +440,11 @@ class SettingsScreen(QWidget):
         barcode_sim.setStyleSheet("font-size: 16px; letter-spacing: 2px; color: #0F172A; margin-top: 6px;")
         ticket_layout.addWidget(barcode_sim)
 
-        preview_layout.addWidget(self.ticket_frame)
+        ticket_wrapper.addStretch()
+        ticket_wrapper.addWidget(self.ticket_frame)
+        ticket_wrapper.addStretch()
+
+        preview_layout.addLayout(ticket_wrapper)
         preview_layout.addStretch()
 
         right_col.addWidget(preview_card)
