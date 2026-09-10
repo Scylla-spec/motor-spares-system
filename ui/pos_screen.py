@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QComboBox, QSplitter, QFrame, QInputDialog
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QColor
 
 from models.user import User
@@ -40,8 +40,16 @@ class POSScreen(QWidget):
         self.current_user = current_user
         self.cart_items = {}  # part_id -> SaleItem
         self._customers = []  # cached customer list
+
+        # Debounce timer: fires 200ms after the user stops typing so we
+        # don't open a new DB connection on every single keystroke.
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(200)
+        self._search_timer.timeout.connect(self._fire_search)
+
         self.setup_ui()
-        self.perform_search("")  # Load initial catalog
+        self.perform_search("")  # Load initial catalog (bypasses timer)
         self.refresh_customers()
 
     def setup_ui(self):
@@ -104,7 +112,7 @@ class POSScreen(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Scan barcode or search by part#, name, brand...")
         self.search_input.setFixedHeight(34)
-        self.search_input.textChanged.connect(self.perform_search)
+        self.search_input.textChanged.connect(self._on_search_text_changed)
         left_layout.addWidget(self.search_input)
 
         self.results_table = QTableWidget()
@@ -266,6 +274,18 @@ class POSScreen(QWidget):
         self.customer_combo.addItem("Walk-in", None)
         for c in self._customers:
             self.customer_combo.addItem(c.name, c.customer_id)
+
+    # ------------------------------------------------------------------
+    # Search debounce helpers
+    # ------------------------------------------------------------------
+    def _on_search_text_changed(self, text: str):
+        """Restart the debounce timer every time the text changes.
+        The actual DB query only runs once the user pauses for 200ms."""
+        self._search_timer.start()  # restarts if already running
+
+    def _fire_search(self):
+        """Called by the timer after the debounce delay expires."""
+        self.perform_search(self.search_input.text())
 
     def perform_search(self, text):
         text_clean = text.strip()
