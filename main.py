@@ -16,8 +16,28 @@ def main():
     ensure_default_admin()
     
     # 3. Setup GUI Application
+    # Ensure Windows taskbar groups and shows the custom app icon
+    try:
+        import ctypes
+        myappid = "motorsparessystem.inventory.pos.1.0"
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except Exception:
+        pass
+
     app = QApplication(sys.argv)
-    
+    app.setApplicationName("Motor Spares System")
+    app.setApplicationDisplayName("Motor Spares System")
+
+    # Set application favicon/window icon
+    import os
+    from PySide6.QtGui import QIcon
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    icon_path = os.path.join(base_dir, "assets", "icons", "favicon.ico")
+    if not os.path.exists(icon_path):
+        icon_path = os.path.join(base_dir, "assets", "icons", "favicon.png")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+
     # Set global modern ERP theme
     from ui.theme import GLOBAL_APP_QSS
     app.setStyle("Fusion")
