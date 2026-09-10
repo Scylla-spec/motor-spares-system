@@ -79,3 +79,16 @@ def test_record_stock_in_increases_quantity(test_db):
     record_stock_in(part_id, 20)
 
     assert get_all_parts()[0].quantity_on_hand == 30
+
+
+def test_part_vehicle_type_persistence(test_db):
+    add_part(_make_part(part_number="BK-001", name="Chain Kit", vehicle_type="Motorbike"))
+    add_part(_make_part(part_number="CR-001", name="Brake Disk", vehicle_type="Car"))
+    add_part(_make_part(part_number="BT-001", name="Universal Spark Plug", vehicle_type="Both"))
+
+    parts = get_all_parts()
+    assert len(parts) == 3
+    vt_map = {p.part_number: p.vehicle_type for p in parts}
+    assert vt_map["BK-001"] == "Motorbike"
+    assert vt_map["CR-001"] == "Car"
+    assert vt_map["BT-001"] == "Both"

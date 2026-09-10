@@ -22,12 +22,14 @@ def add_part(part: Part) -> bool:
         cursor.execute("""
             INSERT INTO Part (
                 part_number, name, category, brand, compatible_vehicles, 
-                quantity_on_hand, cost_price, selling_price, reorder_level, supplier_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                quantity_on_hand, cost_price, selling_price, reorder_level, supplier_id,
+                vehicle_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             part.part_number, part.name, part.category, part.brand, 
             part.compatible_vehicles, part.quantity_on_hand, part.cost_price, 
-            part.selling_price, part.reorder_level, part.supplier_id
+            part.selling_price, part.reorder_level, part.supplier_id,
+            part.vehicle_type or "Car"
         ))
         conn.commit()
         
@@ -101,12 +103,13 @@ def update_part(part: Part, user_id: int) -> bool:
             UPDATE Part SET 
                 part_number = ?, name = ?, category = ?, brand = ?, 
                 compatible_vehicles = ?, reorder_level = ?, supplier_id = ?,
-                cost_price = ?, selling_price = ?
+                cost_price = ?, selling_price = ?, vehicle_type = ?
             WHERE part_id = ?
         """, (
             part.part_number, part.name, part.category, part.brand,
             part.compatible_vehicles, part.reorder_level, part.supplier_id,
-            part.cost_price, part.selling_price, part.part_id
+            part.cost_price, part.selling_price, part.vehicle_type or "Car",
+            part.part_id
         ))
 
         # Audit price changes
@@ -325,6 +328,12 @@ def _record_stock_movement(cursor, part_id: int, movement_type: str, quantity: i
 
 def _row_to_part(row: sqlite3.Row) -> Part:
     """Internal helper to convert a database row to a Part object."""
+    # vehicle_type may be absent on very old DBs before the migration runs;
+    # fall back to 'Car' rather than raising a KeyError.
+    try:
+        vt = row["vehicle_type"] or "Car"
+    except (IndexError, KeyError):
+        vt = "Car"
     return Part(
         part_id=row["part_id"],
         part_number=row["part_number"],
@@ -336,5 +345,6 @@ def _row_to_part(row: sqlite3.Row) -> Part:
         cost_price=row["cost_price"],
         selling_price=row["selling_price"],
         reorder_level=row["reorder_level"],
-        supplier_id=row["supplier_id"]
+        supplier_id=row["supplier_id"],
+        vehicle_type=vt,
     )
