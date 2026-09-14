@@ -1,6 +1,7 @@
 import os
 import shutil
 import sqlite3
+import subprocess
 from datetime import datetime
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -17,6 +18,10 @@ from ui.theme import (
     COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_PRIMARY_ORANGE,
     COLOR_CANVAS_BG, ScreenHeader, ICON_SETTINGS,
     set_btn_icon, ICON_FOLDER, ICON_X, ICON_PRINTER, ICON_SEARCH, ICON_SAVE, ICON_DOWNLOAD
+)
+from utils.version import (
+    APP_NAME, APP_VERSION, APP_EDITION, APP_VERSION_FULL,
+    POWERED_BY, BUILT_WITH, SUPPORT_EMAIL, COMPANY_NAME, RELEASE_DATE
 )
 
 
@@ -890,7 +895,7 @@ class SettingsScreen(QWidget):
             else:
                 db_size_str = f"{sz / (1024 * 1024):.2f} MB"
 
-        grid.addWidget(make_stat_box("Application Version", "v2.4.0 Commercial", ""), 0, 0)
+        grid.addWidget(make_stat_box("Application Version", APP_VERSION_FULL, ""), 0, 0)
         grid.addWidget(make_stat_box("Database Engine", "SQLite 3 (WAL)", ""), 0, 1)
         grid.addWidget(make_stat_box("Database Storage", f"{db_size_str}", ""), 1, 0)
         grid.addWidget(make_stat_box("Connection Status", "Online & Operational", ""), 1, 1)
@@ -1023,6 +1028,146 @@ class SettingsScreen(QWidget):
         maint_layout.addWidget(sec_box)
 
         right_col.addWidget(maint_card)
+
+        # ── About & Legal Card ─────────────────────────────────────────────
+        about_card = self._create_card_frame()
+        about_layout = QVBoxLayout(about_card)
+        about_layout.setSpacing(12)
+
+        about_title = QLabel("About & Legal")
+        about_title.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
+        about_layout.addWidget(about_title)
+
+        # ── Version badge ──────────────────────────────────────────────────
+        version_frame = QFrame()
+        version_frame.setObjectName("statBox")
+        version_frame.setStyleSheet("""
+            QFrame#statBox {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #FFF7ED, stop:1 #FFEDD5);
+                border: 1px solid #FED7AA;
+                border-radius: 8px;
+                padding: 12px 16px;
+            }
+        """)
+        vf_layout = QHBoxLayout(version_frame)
+        vf_layout.setContentsMargins(0, 0, 0, 0)
+        vf_layout.setSpacing(12)
+
+        app_name_lbl = QLabel(APP_NAME)
+        app_name_lbl.setStyleSheet("font-size: 13px; font-weight: 700; color: #C2410C;")
+        vf_layout.addWidget(app_name_lbl)
+
+        vf_layout.addStretch()
+
+        ver_badge = QLabel(APP_VERSION_FULL)
+        ver_badge.setStyleSheet("""
+            background-color: #F97316;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 4px;
+        """)
+        vf_layout.addWidget(ver_badge)
+
+        release_lbl = QLabel(f"Released: {RELEASE_DATE}")
+        release_lbl.setStyleSheet("font-size: 11px; color: #92400E; font-weight: 600;")
+        vf_layout.addWidget(release_lbl)
+
+        about_layout.addWidget(version_frame)
+
+        # ── Tech stack info ────────────────────────────────────────────────
+        built_lbl = QLabel(f"Built with: {BUILT_WITH}")
+        built_lbl.setStyleSheet(f"font-size: 11px; color: {COLOR_TEXT_SECONDARY};")
+        about_layout.addWidget(built_lbl)
+
+        # ── Powered By banner ──────────────────────────────────────────────
+        powered_frame = QFrame()
+        powered_frame.setObjectName("tipBox")
+        pf_layout = QHBoxLayout(powered_frame)
+        pf_layout.setContentsMargins(8, 6, 8, 6)
+        pf_layout.setSpacing(8)
+
+        powered_icon = QLabel("⚡")
+        powered_icon.setStyleSheet("font-size: 16px;")
+        pf_layout.addWidget(powered_icon)
+
+        powered_lbl = QLabel(POWERED_BY)
+        powered_lbl.setStyleSheet(
+            "font-size: 12px; font-weight: 700; "
+            "color: #7C3AED; letter-spacing: 0.4px;"
+        )
+        pf_layout.addWidget(powered_lbl)
+        pf_layout.addStretch()
+
+        company_lbl = QLabel(f"© 2026 {COMPANY_NAME}")
+        company_lbl.setStyleSheet("font-size: 11px; color: #64748B;")
+        pf_layout.addWidget(company_lbl)
+
+        about_layout.addWidget(powered_frame)
+
+        # ── Document link buttons ──────────────────────────────────────────
+        docs_title = QLabel("Documents & Resources")
+        docs_title.setStyleSheet("font-size: 12px; font-weight: 700; color: #334155; margin-top: 4px;")
+        about_layout.addWidget(docs_title)
+
+        def _make_doc_btn(label: str, filename: str, icon: str = "📄") -> QPushButton:
+            btn = QPushButton(f"  {icon}  {label}")
+            btn.setFixedHeight(34)
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #F8FAFC;
+                    color: #1D4ED8;
+                    border: 1px solid #BFDBFE;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    text-align: left;
+                    padding: 0px 14px;
+                }
+                QPushButton:hover {
+                    background-color: #EFF6FF;
+                    border-color: #93C5FD;
+                    color: #1E40AF;
+                }
+                QPushButton:pressed {
+                    background-color: #DBEAFE;
+                }
+            """)
+
+            def _open(checked=False, _fn=filename):
+                doc_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs", _fn)
+                if os.path.exists(doc_path):
+                    try:
+                        os.startfile(doc_path)  # Windows: opens with default app
+                    except AttributeError:
+                        subprocess.Popen(["xdg-open", doc_path])  # Linux/macOS fallback
+                else:
+                    QMessageBox.warning(
+                        None, "File Not Found",
+                        f"Could not locate:\n{doc_path}\n\nPlease reinstall the application."
+                    )
+
+            btn.clicked.connect(_open)
+            return btn
+
+        docs_grid = QGridLayout()
+        docs_grid.setSpacing(8)
+        docs_grid.addWidget(_make_doc_btn("User Manual", "USER_MANUAL.md", "📖"), 0, 0)
+        docs_grid.addWidget(_make_doc_btn("First-Run Setup Guide", "FIRST_RUN_GUIDE.md", "🚀"), 0, 1)
+        docs_grid.addWidget(_make_doc_btn("Privacy Policy", "PRIVACY_POLICY.md", "🔒"), 1, 0)
+        docs_grid.addWidget(_make_doc_btn("Terms of Service", "TERMS_OF_SERVICE.md", "📋"), 1, 1)
+        docs_grid.addWidget(_make_doc_btn("Hardware Guide (ESC/POS)", "HARDWARE_GUIDE.md", "🖨️"), 2, 0)
+        docs_grid.addWidget(_make_doc_btn("Feature Sheet", "COMMERCIAL_FEATURE_SHEET.md", "⭐"), 2, 1)
+        about_layout.addLayout(docs_grid)
+
+        # ── Support contact ────────────────────────────────────────────────
+        support_lbl = QLabel(f"📧 Support: {SUPPORT_EMAIL}")
+        support_lbl.setStyleSheet("font-size: 11px; color: #64748B; margin-top: 4px;")
+        about_layout.addWidget(support_lbl)
+
+        right_col.addWidget(about_card)
         right_col.addStretch()
 
         layout.addLayout(right_col, 5)

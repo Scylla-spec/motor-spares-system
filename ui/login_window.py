@@ -15,6 +15,7 @@ from ui.theme import (
     COLOR_SIDEBAR_BG, COLOR_PRIMARY_ORANGE, COLOR_PRIMARY_ORANGE_HOVER,
     COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_BORDER
 )
+from utils.version import APP_VERSION_FULL, POWERED_BY
 
 class LoginWindow(QDialog):
     login_successful = Signal(object)  # Emits the authenticated User object
@@ -115,6 +116,20 @@ class LoginWindow(QDialog):
         """)
         self.login_button.clicked.connect(self.attempt_login)
         card_layout.addWidget(self.login_button)
+
+        # Version & Powered By footer
+        card_layout.addSpacing(4)
+        footer_ver = QLabel(APP_VERSION_FULL)
+        footer_ver.setAlignment(Qt.AlignCenter)
+        footer_ver.setStyleSheet(f"font-size: 10px; color: #94A3B8; font-weight: 600;")
+        card_layout.addWidget(footer_ver)
+
+        footer_powered = QLabel(POWERED_BY)
+        footer_powered.setAlignment(Qt.AlignCenter)
+        footer_powered.setStyleSheet(
+            "font-size: 10px; color: #818CF8; font-weight: 700;"
+        )
+        card_layout.addWidget(footer_powered)
 
         main_layout.addWidget(card)
 

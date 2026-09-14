@@ -35,6 +35,7 @@ from ui.theme import (
     ICON_CUSTOMERS, ICON_SUPPLIERS, ICON_REPORTS, ICON_USER_MGMT,
     ICON_SETTINGS, ICON_LOGOUT
 )
+from utils.version import APP_VERSION_FULL, POWERED_BY
 
 
 class ModernTopBar(QFrame):
@@ -269,6 +270,23 @@ class DashboardWindow(QMainWindow):
         sidebar_layout.addWidget(self.sidebar_list)
 
         sidebar_layout.addStretch()
+
+        # ── Sidebar Footer: Version & Powered By ──────────────────────────
+        ver_lbl = QLabel(APP_VERSION_FULL)
+        ver_lbl.setAlignment(Qt.AlignCenter)
+        ver_lbl.setStyleSheet(
+            "color: #475569; font-size: 10px; font-weight: 600;"
+        )
+        sidebar_layout.addWidget(ver_lbl)
+
+        powered_lbl = QLabel(POWERED_BY)
+        powered_lbl.setAlignment(Qt.AlignCenter)
+        powered_lbl.setWordWrap(True)
+        powered_lbl.setStyleSheet(
+            "color: #6366F1; font-size: 10px; font-weight: 700; "
+            "padding: 2px 0px 6px 0px;"
+        )
+        sidebar_layout.addWidget(powered_lbl)
 
         root_layout.addWidget(sidebar_frame)
 
