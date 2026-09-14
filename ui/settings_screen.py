@@ -89,10 +89,10 @@ class SettingsScreen(QWidget):
                 background: transparent;
             }}
             QFrame#waBubble {{
-                background-color: #DCF8C6;
-                border: 1px solid #C4E1A4;
-                border-radius: 8px;
-                padding: 10px;
+                background-color: #F8FAFC;
+                border: 1px solid #E2E8F0;
+                border-radius: 6px;
+                padding: 12px;
             }}
             QFrame#waBubble QLabel {{
                 border: none;
@@ -340,14 +340,14 @@ class SettingsScreen(QWidget):
         preview_title.setStyleSheet(f"font-size: 14px; font-weight: 700; color: {COLOR_TEXT_PRIMARY};")
         preview_header_row.addWidget(preview_title)
 
-        live_badge = QLabel("LIVE PREVIEW")
+        live_badge = QLabel("LIVE")
         live_badge.setStyleSheet("""
-            background-color: #DCFCE7;
-            color: #15803D;
+            background-color: #F1F5F9;
+            color: #64748B;
             font-size: 10px;
-            font-weight: 800;
+            font-weight: 700;
             padding: 3px 8px;
-            border-radius: 10px;
+            border-radius: 4px;
         """)
         preview_header_row.addWidget(live_badge)
         preview_header_row.addStretch()
@@ -747,7 +747,7 @@ class SettingsScreen(QWidget):
         calc_layout.addLayout(calc_row)
 
         self.calc_result_label = QLabel("= 265.00 ZiG   |   = 182.00 ZAR")
-        self.calc_result_label.setStyleSheet("font-size: 13px; font-weight: 800; color: #D97706; padding: 2px 0;")
+        self.calc_result_label.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A; padding: 2px 0;")
         calc_layout.addWidget(self.calc_result_label)
 
         curr_layout.addWidget(calc_box)
@@ -793,9 +793,9 @@ class SettingsScreen(QWidget):
         chat_box = QFrame()
         chat_box.setStyleSheet("""
             QFrame {
-                background-color: #EFEAE2;
-                border: 1px solid #CBD5E1;
-                border-radius: 8px;
+                background-color: #F8FAFC;
+                border: 1px solid #E2E8F0;
+                border-radius: 6px;
                 padding: 10px;
             }
         """)
@@ -807,7 +807,7 @@ class SettingsScreen(QWidget):
         wa_icon = QLabel("[WA]")
         chat_top.addWidget(wa_icon)
         chat_contact = QLabel("John Doe (Customer)")
-        chat_contact.setStyleSheet("font-size: 12px; font-weight: 700; color: #075E54;")
+        chat_contact.setStyleSheet("font-size: 12px; font-weight: 700; color: #334155;")
         chat_top.addWidget(chat_contact)
         chat_top.addStretch()
         chat_layout.addLayout(chat_top)
@@ -998,20 +998,20 @@ class SettingsScreen(QWidget):
         backup_btn.setFixedHeight(36)
         backup_btn.setStyleSheet("""
             QPushButton {
-                background-color: #ECFDF5;
-                color: #047857;
-                border: 1px solid #A7F3D0;
+                background-color: #F1F5F9;
+                color: #0F172A;
+                border: 1px solid #CBD5E1;
                 border-radius: 6px;
                 font-weight: 700;
                 padding: 0px 16px;
             }
             QPushButton:hover {
-                background-color: #D1FAE5;
-                border-color: #6EE7B7;
+                background-color: #E2E8F0;
+                border-color: #94A3B8;
             }
         """)
         backup_btn.clicked.connect(self._create_instant_backup)
-        set_btn_icon(backup_btn, ICON_DOWNLOAD, size=14, color='#047857')
+        set_btn_icon(backup_btn, ICON_DOWNLOAD, size=14, color='#475569')
         backup_row.addWidget(backup_btn)
 
         self.backup_status_label = QLabel("Saved to /backups folder")
@@ -1043,10 +1043,9 @@ class SettingsScreen(QWidget):
         version_frame.setObjectName("statBox")
         version_frame.setStyleSheet("""
             QFrame#statBox {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #FFF7ED, stop:1 #FFEDD5);
-                border: 1px solid #FED7AA;
-                border-radius: 8px;
+                background-color: #F8FAFC;
+                border: 1px solid #E2E8F0;
+                border-radius: 6px;
                 padding: 12px 16px;
             }
         """)
@@ -1055,15 +1054,15 @@ class SettingsScreen(QWidget):
         vf_layout.setSpacing(12)
 
         app_name_lbl = QLabel(APP_NAME)
-        app_name_lbl.setStyleSheet("font-size: 13px; font-weight: 700; color: #C2410C;")
+        app_name_lbl.setStyleSheet("font-size: 13px; font-weight: 700; color: #1E293B;")
         vf_layout.addWidget(app_name_lbl)
 
         vf_layout.addStretch()
 
         ver_badge = QLabel(APP_VERSION_FULL)
         ver_badge.setStyleSheet("""
-            background-color: #F97316;
-            color: white;
+            background-color: #334155;
+            color: #FFFFFF;
             font-size: 11px;
             font-weight: 700;
             padding: 3px 10px;
@@ -1072,7 +1071,7 @@ class SettingsScreen(QWidget):
         vf_layout.addWidget(ver_badge)
 
         release_lbl = QLabel(f"Released: {RELEASE_DATE}")
-        release_lbl.setStyleSheet("font-size: 11px; color: #92400E; font-weight: 600;")
+        release_lbl.setStyleSheet("font-size: 11px; color: #64748B; font-weight: 500;")
         vf_layout.addWidget(release_lbl)
 
         about_layout.addWidget(version_frame)
@@ -1118,8 +1117,8 @@ class SettingsScreen(QWidget):
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #F8FAFC;
-                    color: #1D4ED8;
-                    border: 1px solid #BFDBFE;
+                    color: #334155;
+                    border: 1px solid #E2E8F0;
                     border-radius: 6px;
                     font-size: 12px;
                     font-weight: 600;
@@ -1127,12 +1126,12 @@ class SettingsScreen(QWidget):
                     padding: 0px 14px;
                 }
                 QPushButton:hover {
-                    background-color: #EFF6FF;
-                    border-color: #93C5FD;
-                    color: #1E40AF;
+                    background-color: #F1F5F9;
+                    border-color: #94A3B8;
+                    color: #0F172A;
                 }
                 QPushButton:pressed {
-                    background-color: #DBEAFE;
+                    background-color: #E2E8F0;
                 }
             """)
 
@@ -1285,7 +1284,7 @@ class SettingsScreen(QWidget):
         if not self._is_loading:
             self._is_dirty = True
             self.dirty_status_label.setText("● Unsaved changes")
-            self.dirty_status_label.setStyleSheet("font-size: 12px; font-weight: 700; color: #D97706;")
+            self.dirty_status_label.setStyleSheet("font-size: 12px; font-weight: 600; color: #475569;")
 
     def _on_branding_changed(self):
         self._mark_dirty()
@@ -1305,8 +1304,8 @@ class SettingsScreen(QWidget):
         if printer_name:
             self.printer_status_pill.setText(f"Configured: {printer_name}")
             self.printer_status_pill.setStyleSheet("""
-                background-color: #DCFCE7;
-                color: #15803D;
+                background-color: #F1F5F9;
+                color: #1E293B;
                 font-size: 11px;
                 font-weight: 700;
                 padding: 4px 10px;
