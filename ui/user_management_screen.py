@@ -165,16 +165,17 @@ class UserManagementScreen(QWidget):
             del_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #FFFFFF;
-                    color: #EF4444;
-                    font-weight: 700;
+                    color: #475569;
+                    font-weight: 600;
                     font-size: 11px;
-                    border: 1px solid #FECACA;
+                    border: 1px solid #CBD5E1;
                     border-radius: 4px;
                     padding: 0px;
                 }
                 QPushButton:hover {
-                    background-color: #FEF2F2;
-                    border-color: #EF4444;
+                    background-color: #F1F5F9;
+                    border-color: #94A3B8;
+                    color: #0F172A;
                 }
             """)
             del_btn.clicked.connect(lambda checked, u=user: self.on_delete_user(u))

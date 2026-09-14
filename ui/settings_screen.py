@@ -299,20 +299,21 @@ class SettingsScreen(QWidget):
         clear_logo_btn.setFixedHeight(30)
         clear_logo_btn.setStyleSheet("""
             QPushButton {
-                background-color: #FEF2F2;
-                color: #DC2626;
-                border: 1px solid #FECACA;
+                background-color: #FFFFFF;
+                color: #475569;
+                border: 1px solid #CBD5E1;
                 border-radius: 6px;
                 font-weight: 600;
                 padding: 0px 12px;
             }
             QPushButton:hover {
-                background-color: #FEE2E2;
-                border-color: #F87171;
+                background-color: #F1F5F9;
+                border-color: #94A3B8;
+                color: #0F172A;
             }
         """)
         clear_logo_btn.clicked.connect(self.clear_logo)
-        set_btn_icon(clear_logo_btn, ICON_X, size=13, color='#DC2626')
+        set_btn_icon(clear_logo_btn, ICON_X, size=13, color='#475569')
         logo_btn_col.addWidget(clear_logo_btn)
 
         logo_hint = QLabel("PNG or JPG (high-contrast monochrome logos print best on thermal paper)")
@@ -828,7 +829,7 @@ class SettingsScreen(QWidget):
         self.wa_bubble_text.setWordWrap(True)
         bubble_layout.addWidget(self.wa_bubble_text)
 
-        wa_time = QLabel("10:42 AM  ✓✓")
+        wa_time = QLabel("10:42 AM")
         wa_time.setAlignment(Qt.AlignRight)
         wa_time.setStyleSheet("font-size: 10px; color: #4B5563;")
         bubble_layout.addWidget(wa_time)
@@ -1196,14 +1197,14 @@ class SettingsScreen(QWidget):
         bar_layout.setSpacing(14)
 
         # Status badge
-        self.dirty_status_label = QLabel("✓ All settings up to date")
-        self.dirty_status_label.setStyleSheet("font-size: 12px; font-weight: 600; color: #16A34A;")
+        self.dirty_status_label = QLabel("All settings up to date")
+        self.dirty_status_label.setStyleSheet("font-size: 12px; font-weight: 600; color: #475569;")
         bar_layout.addWidget(self.dirty_status_label)
 
         bar_layout.addStretch()
 
         # Discard button
-        self.discard_btn = QPushButton("↺ Discard Changes")
+        self.discard_btn = QPushButton("Discard Changes")
         self.discard_btn.setFixedHeight(36)
         self.discard_btn.setStyleSheet("""
             QPushButton {
@@ -1417,8 +1418,8 @@ class SettingsScreen(QWidget):
 
         self._is_loading = False
         self._is_dirty = False
-        self.dirty_status_label.setText("✓ All settings up to date")
-        self.dirty_status_label.setStyleSheet("font-size: 12px; font-weight: 600; color: #16A34A;")
+        self.dirty_status_label.setText("All settings up to date")
+        self.dirty_status_label.setStyleSheet("font-size: 12px; font-weight: 600; color: #475569;")
 
     def _refresh_logo_preview(self):
         if self.logo_path and os.path.exists(self.logo_path):
@@ -1460,19 +1461,19 @@ class SettingsScreen(QWidget):
 
         paper_width = self.paper_width_combo.currentData() or "80"
         self.test_status_label.setText("Sending test print to hardware...")
-        self.test_status_label.setStyleSheet("color: #0284C7; font-size: 12px; font-weight: 600;")
+        self.test_status_label.setStyleSheet("color: #475569; font-size: 12px; font-weight: 600;")
 
         success, msg = test_print_thermal_receipt(printer_name, paper_width)
         if success:
-            self.test_status_label.setText("✓ Test receipt sent successfully!")
-            self.test_status_label.setStyleSheet("color: #16A34A; font-size: 12px; font-weight: 700;")
+            self.test_status_label.setText("Test receipt sent successfully.")
+            self.test_status_label.setStyleSheet("color: #334155; font-size: 12px; font-weight: 600;")
             QMessageBox.information(
                 self, "Hardware Test Sent",
                 f"A sample supermarket-style receipt was sent to '{printer_name}'.\nCheck your receipt machine!"
             )
         else:
-            self.test_status_label.setText("✗ Print failed - check connection")
-            self.test_status_label.setStyleSheet("color: #DC2626; font-size: 12px; font-weight: 700;")
+            self.test_status_label.setText("Print failed - check connection.")
+            self.test_status_label.setStyleSheet("color: #991B1B; font-size: 12px; font-weight: 600;")
             QMessageBox.critical(
                 self, "Hardware Test Failed",
                 f"Could not print to '{printer_name}':\n{msg}\n\n"
@@ -1489,14 +1490,14 @@ class SettingsScreen(QWidget):
             conn.close()
             status = res[0] if res else "unknown"
             if status == "ok":
-                self.db_status_label.setText("✓ Database integrity is 100% OK! No corruption.")
-                self.db_status_label.setStyleSheet("font-size: 12px; font-weight: 700; color: #16A34A;")
+                self.db_status_label.setText("Database integrity verified. No issues detected.")
+                self.db_status_label.setStyleSheet("font-size: 12px; font-weight: 600; color: #334155;")
             else:
                 self.db_status_label.setText(f"Warning: {status}")
-                self.db_status_label.setStyleSheet("font-size: 12px; font-weight: 700; color: #DC2626;")
+                self.db_status_label.setStyleSheet("font-size: 12px; font-weight: 600; color: #991B1B;")
         except Exception as e:
             self.db_status_label.setText(f"Error checking database: {e}")
-            self.db_status_label.setStyleSheet("font-size: 12px; color: #DC2626;")
+            self.db_status_label.setStyleSheet("font-size: 12px; color: #991B1B;")
 
     def _create_instant_backup(self):
         try:
@@ -1506,8 +1507,8 @@ class SettingsScreen(QWidget):
             shutil.copyfile(DB_PATH, dest)
             sz = os.path.getsize(dest)
             kb = sz / 1024
-            self.backup_status_label.setText(f"✓ Backup saved! ({kb:.1f} KB)")
-            self.backup_status_label.setStyleSheet("font-size: 12px; font-weight: 700; color: #047857;")
+            self.backup_status_label.setText(f"Backup saved successfully ({kb:.1f} KB).")
+            self.backup_status_label.setStyleSheet("font-size: 12px; font-weight: 600; color: #334155;")
             QMessageBox.information(
                 self, "Backup Created",
                 f"A snapshot of your database has been successfully saved to:\n\n{dest}\n\n"
@@ -1542,8 +1543,8 @@ class SettingsScreen(QWidget):
 
         if update_settings(values):
             self._is_dirty = False
-            self.dirty_status_label.setText("✓ All settings saved successfully!")
-            self.dirty_status_label.setStyleSheet("font-size: 12px; font-weight: 700; color: #16A34A;")
+            self.dirty_status_label.setText("All settings saved successfully.")
+            self.dirty_status_label.setStyleSheet("font-size: 12px; font-weight: 600; color: #475569;")
             QMessageBox.information(self, "Settings Saved", "All store, hardware, and currency settings updated successfully.")
         else:
             QMessageBox.critical(self, "Error", "Failed to save settings to the database.")

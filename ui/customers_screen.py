@@ -272,16 +272,17 @@ class CustomersScreen(QWidget):
                 del_btn.setStyleSheet("""
                     QPushButton {
                         background-color: #FFFFFF;
-                        color: #EF4444;
-                        font-weight: 700;
+                        color: #475569;
+                        font-weight: 600;
                         font-size: 12px;
-                        border: 1px solid #FECACA;
+                        border: 1px solid #CBD5E1;
                         border-radius: 4px;
                         padding: 2px 8px;
                     }
                     QPushButton:hover {
-                        background-color: #FEF2F2;
-                        border-color: #EF4444;
+                        background-color: #F1F5F9;
+                        border-color: #94A3B8;
+                        color: #0F172A;
                     }
                 """)
                 del_btn.clicked.connect(lambda checked, c=cust: self.delete_customer_action(c))

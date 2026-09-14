@@ -390,17 +390,18 @@ class RecordCreditSaleDialog(QDialog):
             remove_btn.setCursor(Qt.PointingHandCursor)
             remove_btn.setStyleSheet("""
                 QPushButton {
-                    color: #EF4444;
-                    background: #FEF2F2;
-                    border: 1px solid #FECACA;
+                    color: #475569;
+                    background: #FFFFFF;
+                    border: 1px solid #CBD5E1;
                     border-radius: 4px;
                     font-size: 11px;
                     font-weight: 600;
                     padding: 2px 8px;
                 }
                 QPushButton:hover {
-                    background: #FEE2E2;
-                    border-color: #FCA5A5;
+                    background: #F1F5F9;
+                    border-color: #94A3B8;
+                    color: #0F172A;
                 }
             """)
             remove_btn.clicked.connect(lambda checked, idx=row: self._remove_item(idx))
@@ -634,16 +635,16 @@ class CreditScreen(QWidget):
                 pay_btn.setStyleSheet("""
                     QPushButton {
                         background-color: #FFFFFF;
-                        color: #15803D;
-                        border: 1px solid #86EFAC;
+                        color: #1E293B;
+                        border: 1px solid #CBD5E1;
                         border-radius: 4px;
                         font-weight: 600;
                         font-size: 12px;
                         padding: 2px 8px;
                     }
                     QPushButton:hover {
-                        background-color: #F0FDF4;
-                        border-color: #4ADE80;
+                        background-color: #F1F5F9;
+                        border-color: #94A3B8;
                     }
                 """)
                 pay_btn.clicked.connect(lambda checked, ord=o: self.settle_order(ord))
@@ -656,21 +657,22 @@ class CreditScreen(QWidget):
             wa_btn.setToolTip(f"Send payment reminder to {o.customer_name} via WhatsApp")
             wa_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #F0FDF4;
-                    color: #166534;
-                    border: 1px solid #86EFAC;
+                    background-color: #FFFFFF;
+                    color: #475569;
+                    border: 1px solid #CBD5E1;
                     border-radius: 4px;
                     font-weight: 600;
                     font-size: 11px;
                     padding: 2px 6px;
                 }
                 QPushButton:hover {
-                    background-color: #DCFCE7;
-                    border-color: #22C55E;
+                    background-color: #F1F5F9;
+                    border-color: #94A3B8;
+                    color: #0F172A;
                 }
             """)
             wa_btn.clicked.connect(lambda checked, ord=o: self.send_whatsapp_reminder(ord))
-            set_btn_icon(wa_btn, ICON_WHATSAPP, size=13, color='#166534')
+            set_btn_icon(wa_btn, ICON_WHATSAPP, size=13, color='#475569')
             action_layout.addWidget(wa_btn)
 
             self.pending_table.setCellWidget(row, 7, action_widget)

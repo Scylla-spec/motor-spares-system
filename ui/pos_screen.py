@@ -191,8 +191,8 @@ class POSScreen(QWidget):
         self.currency_chips_label.setAlignment(Qt.AlignRight)
         self.currency_chips_label.setStyleSheet("""
             font-size: 12px;
-            font-weight: 700;
-            color: #0284C7;
+            font-weight: 600;
+            color: #475569;
             padding: 1px 2px;
         """)
         card_layout.addWidget(self.currency_chips_label)
@@ -229,14 +229,16 @@ class POSScreen(QWidget):
         self.cancel_sale_btn.setStyleSheet("""
             QPushButton {
                 background-color: #FFFFFF;
-                color: #EF4444;
-                border: 1px solid #FECACA;
-                font-weight: 700;
+                color: #475569;
+                border: 1px solid #CBD5E1;
+                font-weight: 600;
                 border-radius: 6px;
                 padding: 6px 12px;
             }
             QPushButton:hover {
-                background-color: #FEF2F2;
+                background-color: #F1F5F9;
+                border-color: #94A3B8;
+                color: #0F172A;
             }
         """)
         self.cancel_sale_btn.clicked.connect(self.cancel_sale)
@@ -437,20 +439,21 @@ class POSScreen(QWidget):
                 remove_btn.setCursor(Qt.PointingHandCursor)
                 remove_btn.setStyleSheet("""
                     QPushButton {
-                        color: #DC2626;
+                        color: #475569;
                         background-color: #FFFFFF;
-                        border: 1px solid #FECACA;
+                        border: 1px solid #CBD5E1;
                         border-radius: 4px;
                         font-size: 14px;
                         padding: 0px;
                     }
                     QPushButton:hover {
-                        background-color: #FEF2F2;
-                        border-color: #F87171;
+                        background-color: #F1F5F9;
+                        border-color: #94A3B8;
+                        color: #0F172A;
                     }
                 """)
                 remove_btn.clicked.connect(lambda checked, pid=part_id: self.remove_from_cart(pid))
-                set_btn_icon(remove_btn, ICON_TRASH, size=14, color='#DC2626')
+                set_btn_icon(remove_btn, ICON_TRASH, size=14, color='#475569')
                 del_layout.addWidget(remove_btn)
                 self.cart_table.setCellWidget(row, 4, del_widget)
 

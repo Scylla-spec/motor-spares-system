@@ -181,7 +181,7 @@ class ViewPOItemsDialog(QDialog):
                 padding: 6px 14px;
             }}
             QPushButton:hover {{
-                background-color: #FFF7ED;
+                background-color: #F1F5F9;
             }}
         """)
         export_btn.clicked.connect(self._export_pdf)
@@ -270,20 +270,21 @@ class AddPODialog(QDialog):
         autofill_btn = QPushButton("Auto-Fill Low Stock Parts")
         autofill_btn.setStyleSheet("""
             QPushButton {
-                background-color: #FEF3C7;
-                color: #B45309;
-                border: 1px solid #FCD34D;
+                background-color: #F1F5F9;
+                color: #0F172A;
+                border: 1px solid #CBD5E1;
                 border-radius: 4px;
                 font-weight: 700;
                 font-size: 11px;
                 padding: 4px 10px;
             }
             QPushButton:hover {
-                background-color: #FDE68A;
+                background-color: #E2E8F0;
+                border-color: #94A3B8;
             }
         """)
         autofill_btn.clicked.connect(self._autofill_low_stock)
-        set_btn_icon(autofill_btn, ICON_ZAPPER, size=13, color='#B45309')
+        set_btn_icon(autofill_btn, ICON_ZAPPER, size=13, color='#475569')
         item_hdr_row.addWidget(autofill_btn)
         item_layout.addLayout(item_hdr_row)
 
@@ -506,17 +507,18 @@ class AddPODialog(QDialog):
             remove_btn.setCursor(Qt.PointingHandCursor)
             remove_btn.setStyleSheet("""
                 QPushButton {
-                    color: #EF4444;
-                    background: #FEF2F2;
-                    border: 1px solid #FECACA;
+                    color: #475569;
+                    background: #FFFFFF;
+                    border: 1px solid #CBD5E1;
                     border-radius: 4px;
                     font-size: 11px;
                     font-weight: 600;
                     padding: 2px 8px;
                 }
                 QPushButton:hover {
-                    background: #FEE2E2;
-                    border-color: #FCA5A5;
+                    background: #F1F5F9;
+                    border-color: #94A3B8;
+                    color: #0F172A;
                 }
             """)
             remove_btn.clicked.connect(lambda checked, idx=row: self._remove_item(idx))
@@ -632,20 +634,21 @@ class SuppliersScreen(QWidget):
         self.reorder_low_btn = QPushButton("Auto-Order Low Stock")
         self.reorder_low_btn.setStyleSheet("""
             QPushButton {
-                background-color: #FEF3C7;
-                color: #B45309;
-                border: 1px solid #FCD34D;
+                background-color: #F1F5F9;
+                color: #0F172A;
+                border: 1px solid #CBD5E1;
                 border-radius: 6px;
                 font-weight: 700;
                 font-size: 12px;
                 padding: 6px 12px;
             }
             QPushButton:hover {
-                background-color: #FDE68A;
+                background-color: #E2E8F0;
+                border-color: #94A3B8;
             }
         """)
         self.reorder_low_btn.clicked.connect(self.open_auto_reorder_po)
-        set_btn_icon(self.reorder_low_btn, ICON_ZAPPER, size=14, color='#B45309')
+        set_btn_icon(self.reorder_low_btn, ICON_ZAPPER, size=14, color='#475569')
         bottom_bar.addWidget(self.reorder_low_btn)
 
         self.add_po_btn = QPushButton("+ Draft New PO")
@@ -730,16 +733,17 @@ class SuppliersScreen(QWidget):
                 del_btn.setStyleSheet("""
                     QPushButton {
                         background-color: #FFFFFF;
-                        color: #EF4444;
-                        font-weight: 700;
+                        color: #475569;
+                        font-weight: 600;
                         font-size: 12px;
-                        border: 1px solid #FECACA;
+                        border: 1px solid #CBD5E1;
                         border-radius: 4px;
                         padding: 2px 8px;
                     }
                     QPushButton:hover {
-                        background-color: #FEF2F2;
-                        border-color: #EF4444;
+                        background-color: #F1F5F9;
+                        border-color: #94A3B8;
+                        color: #0F172A;
                     }
                 """)
                 del_btn.clicked.connect(lambda checked, s=sup: self.delete_supplier_action(s))
@@ -775,14 +779,14 @@ class SuppliersScreen(QWidget):
             self.po_table.setItem(row, 2, QTableWidgetItem(str(po.order_date or "—")))
             self.po_table.setItem(row, 3, QTableWidgetItem(f"${po.total_cost:.2f}"))
 
-            # Status chip
+            # Status text
             status_item = QTableWidgetItem(po.status)
             if po.status == "Draft":
                 status_item.setForeground(QColor("#64748B"))
             elif po.status == "Ordered":
-                status_item.setForeground(QColor("#D97706"))
+                status_item.setForeground(QColor("#475569"))
             elif po.status == "Received":
-                status_item.setForeground(QColor("#16A34A"))
+                status_item.setForeground(QColor("#334155"))
             self.po_table.setItem(row, 4, status_item)
 
             action_widget = QWidget()
@@ -841,21 +845,21 @@ class SuppliersScreen(QWidget):
                 receive_btn.setCursor(Qt.PointingHandCursor)
                 receive_btn.setStyleSheet("""
                     QPushButton {
-                        background-color: #F0FDF4;
-                        color: #15803D;
-                        border: 1px solid #86EFAC;
+                        background-color: #FFFFFF;
+                        color: #1E293B;
+                        border: 1px solid #CBD5E1;
                         border-radius: 4px;
                         font-size: 11px;
                         font-weight: 700;
                         padding: 2px 10px;
                     }
                     QPushButton:hover {
-                        background-color: #DCFCE7;
-                        border-color: #4ADE80;
+                        background-color: #F1F5F9;
+                        border-color: #94A3B8;
                     }
                 """)
                 receive_btn.clicked.connect(lambda checked, p_id=po.po_id: self.receive_po_action(p_id))
-                set_btn_icon(receive_btn, ICON_DOWNLOAD, size=13, color='#15803D')
+                set_btn_icon(receive_btn, ICON_DOWNLOAD, size=13, color='#475569')
                 action_layout.addWidget(receive_btn)
 
             self.po_table.setCellWidget(row, 5, action_widget)

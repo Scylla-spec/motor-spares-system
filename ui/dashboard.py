@@ -78,9 +78,9 @@ class ModernTopBar(QFrame):
                 padding: 4px 12px;
             }}
             QPushButton:hover {{
-                color: #EF4444;
-                border-color: #FECACA;
-                background-color: #FEF2F2;
+                color: #0F172A;
+                border-color: #94A3B8;
+                background-color: #F1F5F9;
             }}
         """)
         logout_btn.clicked.connect(self.logout_requested.emit)

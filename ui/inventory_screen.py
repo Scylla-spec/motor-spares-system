@@ -760,16 +760,16 @@ class InventoryScreen(QWidget):
                 stock_in_btn.setStyleSheet("""
                     QPushButton {
                         background-color: #FFFFFF;
-                        color: #15803D;
-                        border: 1px solid #86EFAC;
+                        color: #0F172A;
+                        border: 1px solid #CBD5E1;
                         border-radius: 4px;
                         font-weight: 600;
                         font-size: 12px;
                         padding: 2px 8px;
                     }
                     QPushButton:hover {
-                        background-color: #F0FDF4;
-                        border-color: #4ADE80;
+                        background-color: #F1F5F9;
+                        border-color: #94A3B8;
                     }
                 """)
                 stock_in_btn.clicked.connect(lambda checked, p=part: self.open_stock_in_dialog(p))
@@ -806,20 +806,21 @@ class InventoryScreen(QWidget):
                     del_btn.setStyleSheet("""
                         QPushButton {
                             background-color: #FFFFFF;
-                            color: #DC2626;
-                            border: 1px solid #FECACA;
+                            color: #475569;
+                            border: 1px solid #CBD5E1;
                             border-radius: 4px;
                             font-weight: 600;
                             font-size: 12px;
                             padding: 2px 8px;
                         }
                         QPushButton:hover {
-                            background-color: #FEF2F2;
-                            border-color: #EF4444;
+                            background-color: #F1F5F9;
+                            border-color: #94A3B8;
+                            color: #0F172A;
                         }
                     """)
                     del_btn.clicked.connect(lambda checked, p=part: self.delete_part_action(p))
-                    set_btn_icon(del_btn, ICON_TRASH, size=13, color='#DC2626')
+                    set_btn_icon(del_btn, ICON_TRASH, size=13, color='#475569')
                     action_layout.addWidget(del_btn)
 
                 self.table.setCellWidget(row, 7, action_widget)

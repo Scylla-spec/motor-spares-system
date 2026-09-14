@@ -274,12 +274,7 @@ class ReportsScreen(QWidget):
 
             # Payment method styling
             pay_item = QTableWidgetItem(tx["payment_method"])
-            if tx["payment_method"] == "Cash":
-                pay_item.setForeground(QColor(COLOR_SUCCESS))
-            elif tx["payment_method"] == "EcoCash":
-                pay_item.setForeground(QColor("#0284C7"))
-            elif tx["payment_method"] == "Card":
-                pay_item.setForeground(QColor("#7C3AED"))
+            pay_item.setForeground(QColor("#334155"))
             self.tx_table.setItem(row, 6, pay_item)
 
             amount_item = QTableWidgetItem(f"${tx['total_amount']:.2f}")
@@ -598,7 +593,7 @@ class ReportsScreen(QWidget):
             QFrame {
                 background-color: #F8FAFC;
                 border: 1px solid #CBD5E1;
-                border-left: 4px solid #0284C7;
+                border-left: 4px solid #475569;
                 border-radius: 6px;
                 padding: 10px 14px;
             }
@@ -736,21 +731,25 @@ class ReportsScreen(QWidget):
             # WhatsApp action button
             wa_btn = QPushButton("WhatsApp")
             wa_btn.setFixedHeight(26)
+            wa_btn.setCursor(Qt.PointingHandCursor)
             wa_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #F0FDF4;
-                    color: #166534;
-                    border: 1px solid #86EFAC;
+                    background-color: #FFFFFF;
+                    color: #475569;
+                    border: 1px solid #CBD5E1;
                     border-radius: 4px;
                     font-weight: 600;
                     font-size: 11px;
+                    padding: 2px 6px;
                 }
                 QPushButton:hover {
-                    background-color: #DCFCE7;
+                    background-color: #F1F5F9;
+                    border-color: #94A3B8;
+                    color: #0F172A;
                 }
             """)
             wa_btn.clicked.connect(lambda checked, o=ord_data: self._send_diag_whatsapp(o))
-            set_btn_icon(wa_btn, ICON_WHATSAPP, size=13, color='#166534')
+            set_btn_icon(wa_btn, ICON_WHATSAPP, size=13, color='#475569')
             self.credit_risk_table.setCellWidget(row, 7, wa_btn)
 
         # 3. Stockout Friction Matrix

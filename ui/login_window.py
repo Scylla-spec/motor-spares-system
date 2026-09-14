@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QFont
 from managers.auth_manager import authenticate_user
 from utils.version import APP_VERSION_FULL, POWERED_BY
+from ui.theme import ICON_X, set_btn_icon
 
 
 class LoginWindow(QDialog):
@@ -168,7 +169,7 @@ class LoginWindow(QDialog):
         # Top control bar with close button
         top_bar = QHBoxLayout()
         top_bar.addStretch()
-        close_btn = QPushButton("✕")
+        close_btn = QPushButton("")
         close_btn.setFixedSize(28, 28)
         close_btn.setCursor(Qt.PointingHandCursor)
         close_btn.setToolTip("Close")
@@ -178,14 +179,13 @@ class LoginWindow(QDialog):
                 color: #94A3B8;
                 border: none;
                 border-radius: 14px;
-                font-size: 14px;
-                font-weight: 700;
             }
             QPushButton:hover {
                 background-color: #F1F5F9;
                 color: #0F172A;
             }
         """)
+        set_btn_icon(close_btn, ICON_X, size=14, color='#94A3B8')
         close_btn.clicked.connect(self.reject)
         top_bar.addWidget(close_btn)
         right_layout.addLayout(top_bar)

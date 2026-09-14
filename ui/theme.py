@@ -109,8 +109,8 @@ QSpinBox::up-button, QDoubleSpinBox::up-button, QDateEdit::up-button {{
 }}
 
 QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover, QDateEdit::up-button:hover {{
-    background-color: #FFF7ED;
-    border-color: #F97316;
+    background-color: #E2E8F0;
+    border-color: #94A3B8;
 }}
 
 QSpinBox::up-arrow, QDoubleSpinBox::up-arrow, QDateEdit::up-arrow {{
@@ -120,7 +120,7 @@ QSpinBox::up-arrow, QDoubleSpinBox::up-arrow, QDateEdit::up-arrow {{
 }}
 
 QSpinBox::up-button:hover QSpinBox::up-arrow, QDoubleSpinBox::up-button:hover QDoubleSpinBox::up-arrow, QDateEdit::up-button:hover QDateEdit::up-arrow {{
-    image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><polygon points='5,0 10,6 0,6' fill='%23F97316'/></svg>");
+    image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><polygon points='5,0 10,6 0,6' fill='%230F172A'/></svg>");
 }}
 
 QSpinBox::down-button, QDoubleSpinBox::down-button, QDateEdit::down-button {{
@@ -134,8 +134,8 @@ QSpinBox::down-button, QDoubleSpinBox::down-button, QDateEdit::down-button {{
 }}
 
 QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover, QDateEdit::down-button:hover {{
-    background-color: #FFF7ED;
-    border-color: #F97316;
+    background-color: #E2E8F0;
+    border-color: #94A3B8;
 }}
 
 QSpinBox::down-arrow, QDoubleSpinBox::down-arrow, QDateEdit::down-arrow {{
@@ -179,8 +179,8 @@ QComboBox::drop-down {{
 QComboBox QAbstractItemView {{
     background-color: #FFFFFF;
     border: 1px solid {COLOR_BORDER};
-    selection-background-color: #FFF7ED;
-    selection-color: {COLOR_PRIMARY_ORANGE};
+    selection-background-color: #F1F5F9;
+    selection-color: {COLOR_TEXT_PRIMARY};
     padding: 4px;
     outline: none;
 }}
@@ -840,12 +840,12 @@ class PlusMinusSpinBox(QWidget):
                 line-height: 11px;
             }
             QPushButton:hover {
-                background-color: #FFF7ED;
-                color: #F97316;
-                border-color: #F97316;
+                background-color: #E2E8F0;
+                color: #0F172A;
+                border-color: #94A3B8;
             }
             QPushButton:pressed {
-                background-color: #FED7AA;
+                background-color: #CBD5E1;
             }
         """)
         self.plus_btn.clicked.connect(self.increment)
@@ -868,12 +868,12 @@ class PlusMinusSpinBox(QWidget):
                 line-height: 11px;
             }
             QPushButton:hover {
-                background-color: #FFF7ED;
-                color: #F97316;
-                border-color: #F97316;
+                background-color: #E2E8F0;
+                color: #0F172A;
+                border-color: #94A3B8;
             }
             QPushButton:pressed {
-                background-color: #FED7AA;
+                background-color: #CBD5E1;
             }
         """)
         self.minus_btn.clicked.connect(self.decrement)
