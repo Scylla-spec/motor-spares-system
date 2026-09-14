@@ -1089,14 +1089,14 @@ class SettingsScreen(QWidget):
         pf_layout.setContentsMargins(8, 6, 8, 6)
         pf_layout.setSpacing(8)
 
-        powered_icon = QLabel("⚡")
-        powered_icon.setStyleSheet("font-size: 16px;")
-        pf_layout.addWidget(powered_icon)
+        powered_icon = QLabel("")
+        powered_icon.setFixedWidth(0)
+        powered_icon.hide()
 
         powered_lbl = QLabel(POWERED_BY)
         powered_lbl.setStyleSheet(
             "font-size: 12px; font-weight: 700; "
-            "color: #7C3AED; letter-spacing: 0.4px;"
+            "color: #0F172A; letter-spacing: 0.4px;"
         )
         pf_layout.addWidget(powered_lbl)
         pf_layout.addStretch()
@@ -1112,7 +1112,7 @@ class SettingsScreen(QWidget):
         docs_title.setStyleSheet("font-size: 12px; font-weight: 700; color: #334155; margin-top: 4px;")
         about_layout.addWidget(docs_title)
 
-        def _make_doc_btn(label: str, filename: str, icon: str = "📄") -> QPushButton:
+        def _make_doc_btn(label: str, filename: str, icon: str = "DOC") -> QPushButton:
             btn = QPushButton(f"  {icon}  {label}")
             btn.setFixedHeight(34)
             btn.setStyleSheet("""
@@ -1154,16 +1154,16 @@ class SettingsScreen(QWidget):
 
         docs_grid = QGridLayout()
         docs_grid.setSpacing(8)
-        docs_grid.addWidget(_make_doc_btn("User Manual", "USER_MANUAL.md", "📖"), 0, 0)
-        docs_grid.addWidget(_make_doc_btn("First-Run Setup Guide", "FIRST_RUN_GUIDE.md", "🚀"), 0, 1)
-        docs_grid.addWidget(_make_doc_btn("Privacy Policy", "PRIVACY_POLICY.md", "🔒"), 1, 0)
-        docs_grid.addWidget(_make_doc_btn("Terms of Service", "TERMS_OF_SERVICE.md", "📋"), 1, 1)
-        docs_grid.addWidget(_make_doc_btn("Hardware Guide (ESC/POS)", "HARDWARE_GUIDE.md", "🖨️"), 2, 0)
-        docs_grid.addWidget(_make_doc_btn("Feature Sheet", "COMMERCIAL_FEATURE_SHEET.md", "⭐"), 2, 1)
+        docs_grid.addWidget(_make_doc_btn("User Manual", "USER_MANUAL.md", "PDF"), 0, 0)
+        docs_grid.addWidget(_make_doc_btn("First-Run Setup Guide", "FIRST_RUN_GUIDE.md", "DOC"), 0, 1)
+        docs_grid.addWidget(_make_doc_btn("Privacy Policy", "PRIVACY_POLICY.md", "PDF"), 1, 0)
+        docs_grid.addWidget(_make_doc_btn("Terms of Service", "TERMS_OF_SERVICE.md", "PDF"), 1, 1)
+        docs_grid.addWidget(_make_doc_btn("Hardware Guide (ESC/POS)", "HARDWARE_GUIDE.md", "DOC"), 2, 0)
+        docs_grid.addWidget(_make_doc_btn("Feature Sheet", "COMMERCIAL_FEATURE_SHEET.md", "PDF"), 2, 1)
         about_layout.addLayout(docs_grid)
 
         # ── Support contact ────────────────────────────────────────────────
-        support_lbl = QLabel(f"📧 Support: {SUPPORT_EMAIL}")
+        support_lbl = QLabel(f"Support: {SUPPORT_EMAIL}")
         support_lbl.setStyleSheet("font-size: 11px; color: #64748B; margin-top: 4px;")
         about_layout.addWidget(support_lbl)
 
@@ -1493,7 +1493,7 @@ class SettingsScreen(QWidget):
                 self.db_status_label.setText("✓ Database integrity is 100% OK! No corruption.")
                 self.db_status_label.setStyleSheet("font-size: 12px; font-weight: 700; color: #16A34A;")
             else:
-                self.db_status_label.setText(f"⚠️ Warning: {status}")
+                self.db_status_label.setText(f"Warning: {status}")
                 self.db_status_label.setStyleSheet("font-size: 12px; font-weight: 700; color: #DC2626;")
         except Exception as e:
             self.db_status_label.setText(f"Error checking database: {e}")

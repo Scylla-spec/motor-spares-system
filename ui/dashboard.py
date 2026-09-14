@@ -283,7 +283,7 @@ class DashboardWindow(QMainWindow):
         powered_lbl.setAlignment(Qt.AlignCenter)
         powered_lbl.setWordWrap(True)
         powered_lbl.setStyleSheet(
-            "color: #6366F1; font-size: 10px; font-weight: 700; "
+            "color: #475569; font-size: 10px; font-weight: 600; "
             "padding: 2px 0px 6px 0px;"
         )
         sidebar_layout.addWidget(powered_lbl)

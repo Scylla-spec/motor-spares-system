@@ -8,7 +8,7 @@ APP_VERSION = "v2.4.0"
 APP_EDITION = "Commercial"
 APP_VERSION_FULL = f"{APP_VERSION} {APP_EDITION}"
 
-POWERED_BY = "Powered by Antigravity AI"
+POWERED_BY = "Powered by Irrefutable"
 BUILT_WITH = "PySide6 · SQLite 3 (WAL) · Python 3.11"
 SUPPORT_EMAIL = "support@motorspares.app"
 COMPANY_NAME = "Motor Spares Solutions Ltd"
