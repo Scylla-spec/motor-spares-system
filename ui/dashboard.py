@@ -318,9 +318,10 @@ class DashboardWindow(QMainWindow):
         self.suppliers_screen = SuppliersScreen(self.current_user)
         self.add_nav_item("Suppliers", self.suppliers_screen, ICON_SUPPLIERS)
 
-        # 6: Reports
-        self.reports_screen = ReportsScreen(self.current_user)
-        self.add_nav_item("Reports", self.reports_screen, ICON_REPORTS)
+        # 6: Reports (Admin Only)
+        if self.current_user.is_admin():
+            self.reports_screen = ReportsScreen(self.current_user)
+            self.add_nav_item("Reports", self.reports_screen, ICON_REPORTS)
 
         # 7: User Management (Admin Only)
         if self.current_user.is_admin():

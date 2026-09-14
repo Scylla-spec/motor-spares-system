@@ -31,14 +31,62 @@ from PIL import Image, ImageOps
 from utils.excel_importer import COLUMN_ALIASES, _normalise, auto_correct_rows
 
 import os
+import sys
 import shutil
 import platform
 
 # ---------------------------------------------------------------------------
-# Tesseract availability check — cross-platform auto-detection (Windows, macOS, Linux)
+# Tesseract availability check & Tessdata discovery
 # ---------------------------------------------------------------------------
 TESSERACT_AVAILABLE: bool = False
 TESSERACT_ERROR: str = ""
+
+if getattr(sys, "frozen", False):
+    _base_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+else:
+    _base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+_ASSETS_TESSDATA = os.path.join(_base_dir, "assets", "tessdata")
+
+_tessdata_candidates = [
+    os.environ.get("TESSDATA_PREFIX", ""),
+    _ASSETS_TESSDATA,
+    os.path.join(_base_dir, "tessdata"),
+    r"C:\Program Files\Tesseract-OCR\tessdata",
+    r"C:\Program Files (x86)\Tesseract-OCR\tessdata",
+    os.path.expanduser(r"~\AppData\Local\Programs\Tesseract-OCR\tessdata"),
+    "/usr/share/tesseract-ocr/5/tessdata",
+    "/usr/share/tesseract-ocr/4.00/tessdata",
+    "/usr/share/tessdata",
+    "/opt/homebrew/share/tessdata",
+    "/usr/local/share/tessdata",
+]
+
+_resolved_tessdata_dir = None
+for _td in _tessdata_candidates:
+    if _td and os.path.isdir(_td) and os.path.isfile(os.path.join(_td, "eng.traineddata")):
+        _resolved_tessdata_dir = os.path.abspath(_td)
+        break
+
+if not _resolved_tessdata_dir:
+    _target_file = os.path.join(_ASSETS_TESSDATA, "eng.traineddata")
+    if os.path.isfile(_target_file):
+        _resolved_tessdata_dir = os.path.abspath(_ASSETS_TESSDATA)
+    else:
+        try:
+            os.makedirs(_ASSETS_TESSDATA, exist_ok=True)
+            import urllib.request
+            urllib.request.urlretrieve(
+                "https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata",
+                _target_file
+            )
+            if os.path.isfile(_target_file):
+                _resolved_tessdata_dir = os.path.abspath(_ASSETS_TESSDATA)
+        except Exception as _dl_err:
+            logging.warning(f"Could not auto-download eng.traineddata: {_dl_err}")
+
+if _resolved_tessdata_dir:
+    os.environ["TESSDATA_PREFIX"] = _resolved_tessdata_dir
 
 try:
     import pytesseract
@@ -248,6 +296,13 @@ def parse_image_file(filepath: str) -> Tuple[List[Dict[str, Any]], List[str]]:
         lines = _extract_lines_by_position(img)
     except Exception as e:
         logging.error(f"OCR failed for {filepath}: {e}")
+        err_msg = str(e)
+        if "tessdata" in err_msg.lower() or "traineddata" in err_msg.lower() or "failed loading language" in err_msg.lower():
+            return [], [
+                "Tesseract language data ('eng.traineddata') could not be loaded.\n\n"
+                "Please ensure 'eng.traineddata' is placed in the 'assets/tessdata' directory "
+                "or set the TESSDATA_PREFIX environment variable to your tessdata folder."
+            ]
         return [], [f"Could not read text from this image: {e}"]
 
     if not lines:

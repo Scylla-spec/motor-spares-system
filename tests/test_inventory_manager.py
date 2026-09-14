@@ -6,7 +6,7 @@ BR-02 (deactivated parts are hidden, not deleted), and FR-15 (stock adjustment).
 from models.part import Part
 from managers.inventory_manager import (
     add_part, get_all_parts, search_parts, record_stock_in,
-    record_stock_adjustment, deactivate_part
+    record_stock_adjustment, deactivate_part, update_part
 )
 
 
@@ -79,3 +79,37 @@ def test_record_stock_in_increases_quantity(test_db):
     record_stock_in(part_id, 20)
 
     assert get_all_parts()[0].quantity_on_hand == 30
+
+
+def test_update_part_number_success(test_db, admin_user):
+    add_part(_make_part(part_number="PN-100", name="Brake Pad"))
+    part = get_all_parts()[0]
+    part.part_number = "PN-100-NEW"
+    
+    ok = update_part(part, admin_user.user_id)
+    assert ok is True
+    updated = get_all_parts()[0]
+    assert updated.part_number == "PN-100-NEW"
+
+
+def test_update_part_number_duplicate_fails(test_db, admin_user):
+    add_part(_make_part(part_number="PN-101", name="Part One"))
+    add_part(_make_part(part_number="PN-102", name="Part Two"))
+    parts = get_all_parts()
+    part_two = [p for p in parts if p.part_number == "PN-102"][0]
+    
+    # Attempt to change PN-102 to PN-101 (already taken)
+    part_two.part_number = "PN-101"
+    ok = update_part(part_two, admin_user.user_id)
+    assert ok is False
+
+
+def test_update_part_quantity_updates_stock_and_logs(test_db, admin_user):
+    add_part(_make_part(part_number="PN-200", quantity_on_hand=15))
+    part = get_all_parts()[0]
+    part.quantity_on_hand = 25
+    
+    ok = update_part(part, admin_user.user_id)
+    assert ok is True
+    updated = get_all_parts()[0]
+    assert updated.quantity_on_hand == 25

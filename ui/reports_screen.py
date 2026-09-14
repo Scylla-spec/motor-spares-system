@@ -39,6 +39,18 @@ class ReportsScreen(QWidget):
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(16)
 
+        if not (self.current_user and self.current_user.is_admin()):
+            layout.addWidget(ScreenHeader(
+                ICON_REPORTS,
+                "Reports & Analytics - Access Denied",
+                "Administrator privileges are required to access reports.",
+            ))
+            denied_label = QLabel("You do not have permission to access reports. Please log in with an Administrator account.")
+            denied_label.setStyleSheet("font-size: 14px; color: #DC2626; padding: 20px; font-weight: 600;")
+            layout.addWidget(denied_label)
+            layout.addStretch()
+            return
+
         layout.addWidget(ScreenHeader(
             ICON_REPORTS,
             "Reports & Analytics",

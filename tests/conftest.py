@@ -31,3 +31,22 @@ def admin_user(test_db):
     ensure_default_admin()
     user, _ = authenticate_user("admin", "admin123")
     return user
+
+
+@pytest.fixture
+def cashier_user(test_db):
+    """Creates a cashier account and returns the authenticated User."""
+    from managers.auth_manager import create_user, authenticate_user
+    create_user("cashier1", "cashier123", "Cashier")
+    user, _ = authenticate_user("cashier1", "cashier123")
+    return user
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    """Provides a QApplication instance for UI tests."""
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+    return app

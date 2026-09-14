@@ -77,7 +77,7 @@ def bulk_update_category_prices(category_name: str, percentage_change: float) ->
 
 
 def update_part(part: Part, user_id: int) -> bool:
-    """Updates an existing part. Logs price changes."""
+    """Updates an existing part. Logs price changes and stock quantity changes."""
     part.part_number = normalize_part_number(part.part_number)
     part.name = (part.name or "").strip().upper()
     part.category = normalize_category(part.category)
@@ -87,8 +87,14 @@ def update_part(part: Part, user_id: int) -> bool:
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        # Fetch old prices to see if we need to audit
-        cursor.execute("SELECT cost_price, selling_price FROM Part WHERE part_id = ?", (part.part_id,))
+        # Check if part_number changed and if it is already taken by another part
+        cursor.execute("SELECT part_id FROM Part WHERE part_number = ? AND part_id != ?", (part.part_number, part.part_id))
+        if cursor.fetchone():
+            logging.warning(f"Cannot update part {part.part_id}: part_number '{part.part_number}' already exists.")
+            return False
+
+        # Fetch old prices and stock to see if we need to audit
+        cursor.execute("SELECT cost_price, selling_price, quantity_on_hand FROM Part WHERE part_id = ?", (part.part_id,))
         old_record = cursor.fetchone()
         
         if not old_record:
@@ -96,21 +102,24 @@ def update_part(part: Part, user_id: int) -> bool:
 
         old_cost = old_record["cost_price"]
         old_selling = old_record["selling_price"]
+        old_qty = old_record["quantity_on_hand"]
+        new_qty = part.quantity_on_hand if part.quantity_on_hand is not None else old_qty
 
         cursor.execute("""
             UPDATE Part SET 
                 part_number = ?, name = ?, category = ?, brand = ?, 
                 compatible_vehicles = ?, reorder_level = ?, supplier_id = ?,
-                cost_price = ?, selling_price = ?
+                cost_price = ?, selling_price = ?, quantity_on_hand = ?
             WHERE part_id = ?
         """, (
             part.part_number, part.name, part.category, part.brand,
             part.compatible_vehicles, part.reorder_level, part.supplier_id,
-            part.cost_price, part.selling_price, part.part_id
+            part.cost_price, part.selling_price, new_qty, part.part_id
         ))
 
-        # Audit price changes
         timestamp = datetime.now().isoformat()
+
+        # Audit price changes
         if old_cost != part.cost_price or old_selling != part.selling_price:
             cursor.execute("""
                 INSERT INTO AuditLog (user_id, action, table_name, record_id, old_value, new_value, timestamp)
@@ -119,6 +128,23 @@ def update_part(part: Part, user_id: int) -> bool:
                 user_id, 'PRICE_CHANGE', 'Part', part.part_id, 
                 f"Cost:{old_cost}, Sell:{old_selling}", 
                 f"Cost:{part.cost_price}, Sell:{part.selling_price}", 
+                timestamp
+            ))
+
+        # Audit stock quantity changes
+        if new_qty != old_qty:
+            delta = new_qty - old_qty
+            movement_type = 'IN' if delta > 0 else 'OUT'
+            _record_stock_movement(
+                cursor, part.part_id, movement_type, abs(delta),
+                'Initial Quantity Update' if old_qty == 0 else 'Manual Quantity Edit'
+            )
+            cursor.execute("""
+                INSERT INTO AuditLog (user_id, action, table_name, record_id, old_value, new_value, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                user_id, 'ADJUSTMENT', 'Part', part.part_id, 
+                f"qty:{old_qty}", f"qty:{new_qty}", 
                 timestamp
             ))
 

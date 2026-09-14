@@ -36,9 +36,10 @@ from ui.theme import (
 
 
 class AddEditPartDialog(QDialog):
-    def __init__(self, parent=None, part=None):
+    def __init__(self, parent=None, part=None, current_user=None):
         super().__init__(parent)
         self.part = part
+        self.current_user = current_user or getattr(parent, 'current_user', None)
         self.setWindowTitle("Edit Part" if part else "Add New Part")
         self.setMinimumWidth(440)
         self._suppliers = get_all_suppliers()
@@ -81,8 +82,6 @@ class AddEditPartDialog(QDialog):
 
         self.quantity_on_hand = QSpinBox()
         self.quantity_on_hand.setMaximum(100000)
-        if self.part:
-            self.quantity_on_hand.setEnabled(False)
 
         self.reorder_level = QSpinBox()
         self.reorder_level.setMaximum(100000)
@@ -133,7 +132,10 @@ class AddEditPartDialog(QDialog):
 
     def load_part_data(self):
         self.part_number.setText(self.part.part_number)
-        self.part_number.setEnabled(False)
+        is_admin = bool(self.current_user and self.current_user.is_admin())
+        self.part_number.setEnabled(is_admin)
+        if not is_admin:
+            self.part_number.setToolTip("Admin access required to edit Part Number")
         self.name.setText(self.part.name)
         self.category.setText(self.part.category)
         self.brand.setText(self.part.brand)
@@ -141,6 +143,7 @@ class AddEditPartDialog(QDialog):
         self.cost_price.setValue(self.part.cost_price)
         self.selling_price.setValue(self.part.selling_price)
         self.quantity_on_hand.setValue(self.part.quantity_on_hand)
+        self.quantity_on_hand.setEnabled(True)
         self.reorder_level.setValue(self.part.reorder_level)
         if self.part.supplier_id is not None:
             idx = self.supplier_combo.findData(self.part.supplier_id)
@@ -570,7 +573,7 @@ class InventoryScreen(QWidget):
 
         layout.addLayout(footer_layout)
 
-    def load_inventory(self):
+    def load_inventory(self, preserve_page=False):
         parts = get_all_parts()
         # Filter out deactivated parts
         self.all_active_parts = [p for p in parts if not p.name.startswith("[DEACTIVATED]")]
@@ -579,7 +582,7 @@ class InventoryScreen(QWidget):
         self._populate_filter_dropdowns()
         
         # Apply filters & display
-        self.apply_filters()
+        self.apply_filters(reset_page=not preserve_page)
 
     def _populate_filter_dropdowns(self):
         current_cat = self.category_filter.currentData()
@@ -610,7 +613,7 @@ class InventoryScreen(QWidget):
                 self.brand_filter.setCurrentIndex(idx)
         self.brand_filter.blockSignals(False)
 
-    def apply_filters(self):
+    def apply_filters(self, *args, reset_page=True):
         query = self.search_input.text().strip().lower()
         selected_cat = self.category_filter.currentData()
         selected_brand = self.brand_filter.currentData()
@@ -631,7 +634,8 @@ class InventoryScreen(QWidget):
             filtered.append(p)
 
         self.filtered_parts = filtered
-        self.current_page = 1
+        if reset_page:
+            self.current_page = 1
         self.update_kpi_cards()
         self.render_table_page()
 
@@ -842,13 +846,13 @@ class InventoryScreen(QWidget):
             if part and qty > 0:
                 success = record_stock_in(part.part_id, qty)
                 if success:
-                    self.load_inventory()
+                    self.load_inventory(preserve_page=True)
                     QMessageBox.information(self, "Success", f"Added {qty} units to {part.name}.")
                 else:
                     QMessageBox.critical(self, "Error", "Failed to record stock in.")
 
     def open_add_dialog(self):
-        dialog = AddEditPartDialog(self)
+        dialog = AddEditPartDialog(self, current_user=self.current_user)
         if dialog.exec():
             success = add_part(dialog.part)
             if success:
@@ -857,13 +861,13 @@ class InventoryScreen(QWidget):
                 QMessageBox.critical(self, "Error", "Failed to add part. Check if Part Number is unique.")
 
     def open_edit_dialog(self, part):
-        dialog = AddEditPartDialog(self, part)
+        dialog = AddEditPartDialog(self, part, current_user=self.current_user)
         if dialog.exec():
             success = update_part(dialog.part, self.current_user.user_id)
             if success:
-                self.load_inventory()
+                self.load_inventory(preserve_page=True)
             else:
-                QMessageBox.critical(self, "Error", "Failed to update part.")
+                QMessageBox.critical(self, "Error", "Failed to update part. Check if Part Number is already taken.")
 
     def open_stock_in_dialog(self, part):
         dialog = StockInDialog(self, part)
@@ -871,7 +875,7 @@ class InventoryScreen(QWidget):
             quantity = dialog.quantity.value()
             success = record_stock_in(part.part_id, quantity)
             if success:
-                self.load_inventory()
+                self.load_inventory(preserve_page=True)
             else:
                 QMessageBox.critical(self, "Error", "Failed to record stock in.")
 
@@ -884,7 +888,7 @@ class InventoryScreen(QWidget):
                 part.part_id, delta, reason, self.current_user.user_id
             )
             if success:
-                self.load_inventory()
+                self.load_inventory(preserve_page=True)
                 QMessageBox.information(self, "Stock Adjusted", message)
             else:
                 QMessageBox.critical(self, "Adjustment Failed", message)
@@ -928,6 +932,9 @@ class InventoryScreen(QWidget):
         dialog.import_complete.connect(self.load_inventory)
         dialog.exec()
 
+    def delete_part_action(self, part):
+        self.deactivate(part)
+
     def deactivate(self, part):
         confirm = QMessageBox.question(
             self, "Confirm Deactivation", 
@@ -937,6 +944,6 @@ class InventoryScreen(QWidget):
         if confirm == QMessageBox.Yes:
             success = deactivate_part(part.part_id, self.current_user.user_id)
             if success:
-                self.load_inventory()
+                self.load_inventory(preserve_page=True)
             else:
                 QMessageBox.critical(self, "Error", "Failed to deactivate part.")
