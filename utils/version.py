@@ -4,7 +4,7 @@ Bump APP_VERSION here for every release; referenced across the UI.
 """
 
 APP_NAME = "Motor Spares Management System"
-APP_VERSION = "v2.4.0"
+APP_VERSION = "v2.5.0"
 APP_EDITION = "Commercial"
 APP_VERSION_FULL = f"{APP_VERSION} {APP_EDITION}"
 
