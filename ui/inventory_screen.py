@@ -185,12 +185,17 @@ class AddEditPartDialog(QDialog):
             self.location_input.clear()
 
     def load_part_data(self):
-        self.part_number.setText(self.part.part_number)
         is_admin = bool(self.current_user and self.current_user.is_admin())
+
+        self.part_number.setText(self.part.part_number)
         self.part_number.setEnabled(is_admin)
         if not is_admin:
             self.part_number.setToolTip("Admin access required to edit Part Number")
+
         self.name.setText(self.part.name)
+        self.name.setEnabled(is_admin)
+        if not is_admin:
+            self.name.setToolTip("Admin access required to edit Item Name")
         self.category.setText(self.part.category)
         self.brand.setText(self.part.brand)
         self.compatible_vehicles.setText(self.part.compatible_vehicles)
