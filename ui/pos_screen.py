@@ -126,9 +126,9 @@ class POSScreen(QWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.Fixed)
-        self.results_table.setColumnWidth(5, 100)
+        self.results_table.setColumnWidth(5, 148)
         self.results_table.verticalHeader().setVisible(False)
-        self.results_table.verticalHeader().setDefaultSectionSize(44)
+        self.results_table.verticalHeader().setDefaultSectionSize(60)
         self.results_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.results_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.results_table.setItemDelegateForColumn(4, StockBadgeDelegate(self.results_table))
@@ -302,6 +302,7 @@ class POSScreen(QWidget):
 
         self.results_table.setUpdatesEnabled(False)
         try:
+            self.results_table.clearContents()
             self.results_table.setRowCount(len(display_results))
             for row, part in enumerate(display_results):
                 # 0: ROW # INDEX
@@ -331,21 +332,23 @@ class POSScreen(QWidget):
                 # 5: ACTION
                 add_widget = QWidget()
                 add_layout = QHBoxLayout(add_widget)
-                add_layout.setContentsMargins(4, 2, 4, 2)
+                add_layout.setContentsMargins(4, 7, 4, 7)
                 add_layout.setAlignment(Qt.AlignCenter)
+
+                _BTN_W, _BTN_H = 136, 46  # identical for both states
 
                 if part.quantity_on_hand > 0:
                     add_btn = QPushButton("+ Add")
-                    add_btn.setFixedSize(72, 34)
+                    add_btn.setFixedSize(_BTN_W, _BTN_H)
                     add_btn.setCursor(Qt.PointingHandCursor)
                     add_btn.setStyleSheet(f"""
                         QPushButton {{
                             background-color: {COLOR_PRIMARY_ORANGE};
                             color: #FFFFFF;
                             font-weight: 700;
-                            font-size: 13px;
+                            font-size: 14px;
                             border: none;
-                            border-radius: 5px;
+                            border-radius: 7px;
                             padding: 0px;
                         }}
                         QPushButton:hover {{
@@ -359,16 +362,16 @@ class POSScreen(QWidget):
                     add_layout.addWidget(add_btn)
                 else:
                     disabled_btn = QPushButton("Out of Stock")
-                    disabled_btn.setFixedSize(84, 34)
+                    disabled_btn.setFixedSize(_BTN_W, _BTN_H)
                     disabled_btn.setEnabled(False)
                     disabled_btn.setStyleSheet("""
                         QPushButton {
                             background-color: #F1F5F9;
-                            color: #94A3B8;
-                            font-weight: 600;
-                            font-size: 11px;
-                            border: 1px solid #E2E8F0;
-                            border-radius: 5px;
+                            color: #64748B;
+                            font-weight: 700;
+                            font-size: 13px;
+                            border: 1px solid #CBD5E1;
+                            border-radius: 7px;
                             padding: 0px;
                         }
                     """)
