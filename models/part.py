@@ -15,6 +15,7 @@ class Part:
     selling_price: float
     reorder_level: int
     supplier_id: Optional[int] = None
+    location: Optional[str] = None
     
     def is_low_stock(self) -> bool:
         """Returns True if quantity is at or below the reorder level."""

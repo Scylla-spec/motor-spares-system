@@ -15,6 +15,7 @@ def add_part(part: Part) -> bool:
     part.category = normalize_category(part.category)
     part.brand = (part.brand or "").strip().upper()
     part.compatible_vehicles = (part.compatible_vehicles or "").strip().upper()
+    part.location = (part.location or "").strip().upper() or None
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -22,12 +23,14 @@ def add_part(part: Part) -> bool:
         cursor.execute("""
             INSERT INTO Part (
                 part_number, name, category, brand, compatible_vehicles, 
-                quantity_on_hand, cost_price, selling_price, reorder_level, supplier_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                quantity_on_hand, cost_price, selling_price, reorder_level, supplier_id,
+                location
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             part.part_number, part.name, part.category, part.brand, 
             part.compatible_vehicles, part.quantity_on_hand, part.cost_price, 
-            part.selling_price, part.reorder_level, part.supplier_id
+            part.selling_price, part.reorder_level, part.supplier_id,
+            part.location
         ))
         conn.commit()
         
@@ -83,6 +86,7 @@ def update_part(part: Part, user_id: int) -> bool:
     part.category = normalize_category(part.category)
     part.brand = (part.brand or "").strip().upper()
     part.compatible_vehicles = (part.compatible_vehicles or "").strip().upper()
+    part.location = (part.location or "").strip().upper() or None
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -109,12 +113,14 @@ def update_part(part: Part, user_id: int) -> bool:
             UPDATE Part SET 
                 part_number = ?, name = ?, category = ?, brand = ?, 
                 compatible_vehicles = ?, reorder_level = ?, supplier_id = ?,
-                cost_price = ?, selling_price = ?, quantity_on_hand = ?
+                cost_price = ?, selling_price = ?, quantity_on_hand = ?,
+                location = ?
             WHERE part_id = ?
         """, (
             part.part_number, part.name, part.category, part.brand,
             part.compatible_vehicles, part.reorder_level, part.supplier_id,
-            part.cost_price, part.selling_price, new_qty, part.part_id
+            part.cost_price, part.selling_price, new_qty,
+            part.location, part.part_id
         ))
 
         timestamp = datetime.now().isoformat()
@@ -198,14 +204,14 @@ def search_parts(query: str, include_inactive: bool = False) -> List[Part]:
         if include_inactive:
             cursor.execute("""
                 SELECT * FROM Part
-                WHERE part_number LIKE ? OR name LIKE ? OR category LIKE ? OR brand LIKE ?
-            """, (search_term, search_term, search_term, search_term))
+                WHERE part_number LIKE ? OR name LIKE ? OR category LIKE ? OR brand LIKE ? OR location LIKE ?
+            """, (search_term, search_term, search_term, search_term, search_term))
         else:
             cursor.execute("""
                 SELECT * FROM Part
-                WHERE (part_number LIKE ? OR name LIKE ? OR category LIKE ? OR brand LIKE ?)
+                WHERE (part_number LIKE ? OR name LIKE ? OR category LIKE ? OR brand LIKE ? OR location LIKE ?)
                   AND name NOT LIKE '[DEACTIVATED]%'
-            """, (search_term, search_term, search_term, search_term))
+            """, (search_term, search_term, search_term, search_term, search_term))
 
         for row in cursor.fetchall():
             parts.append(_row_to_part(row))
@@ -351,6 +357,7 @@ def _record_stock_movement(cursor, part_id: int, movement_type: str, quantity: i
 
 def _row_to_part(row: sqlite3.Row) -> Part:
     """Internal helper to convert a database row to a Part object."""
+    loc = row["location"] if "location" in row.keys() else None
     return Part(
         part_id=row["part_id"],
         part_number=row["part_number"],
@@ -362,5 +369,6 @@ def _row_to_part(row: sqlite3.Row) -> Part:
         cost_price=row["cost_price"],
         selling_price=row["selling_price"],
         reorder_level=row["reorder_level"],
-        supplier_id=row["supplier_id"]
+        supplier_id=row["supplier_id"],
+        location=loc
     )

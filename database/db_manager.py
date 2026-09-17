@@ -123,6 +123,7 @@ def initialize_database():
                 selling_price REAL NOT NULL CHECK(selling_price >= 0),
                 reorder_level INTEGER DEFAULT 0,
                 supplier_id INTEGER,
+                location TEXT,
                 FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id) ON DELETE RESTRICT
             );
         """)
@@ -130,6 +131,7 @@ def initialize_database():
         # Search Indexes for Part
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_part_category ON Part(category);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_part_brand ON Part(brand);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_part_location ON Part(location);")
 
         # 5. StockMovement Table
         cursor.execute("""
@@ -307,6 +309,13 @@ def initialize_database():
         po_columns = {row[1] for row in cursor.fetchall()}
         if "po_number" not in po_columns:
             cursor.execute("ALTER TABLE PurchaseOrder ADD COLUMN po_number TEXT;")
+
+        # --- Migration: add location to Part if missing ---
+        cursor.execute("PRAGMA table_info(Part);")
+        part_columns = {row[1] for row in cursor.fetchall()}
+        if "location" not in part_columns:
+            cursor.execute("ALTER TABLE Part ADD COLUMN location TEXT;")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_part_location ON Part(location);")
 
         conn.commit()
         logging.info("Database schema initialized successfully.")

@@ -8,6 +8,7 @@ Implements the clean ERP layout:
 """
 
 import csv
+import re
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
@@ -70,6 +71,46 @@ class AddEditPartDialog(QDialog):
         self.compatible_vehicles = QLineEdit()
         self.compatible_vehicles.setPlaceholderText("e.g. Toyota Hilux, Isuzu D-Max")
 
+        # Location compound selector:
+        # 3 dropdowns for Rack (1-7), Row (1-4), Col (1-2) + synced code preview/input
+        loc_container = QWidget()
+        loc_vbox = QVBoxLayout(loc_container)
+        loc_vbox.setContentsMargins(0, 0, 0, 0)
+        loc_vbox.setSpacing(4)
+
+        loc_picker_layout = QHBoxLayout()
+        loc_picker_layout.setContentsMargins(0, 0, 0, 0)
+        loc_picker_layout.setSpacing(6)
+
+        self.rack_combo = QComboBox()
+        self.rack_combo.addItem("-- Rack --", "")
+        for r in range(1, 8):
+            self.rack_combo.addItem(f"Rack {r}", str(r))
+
+        self.row_combo = QComboBox()
+        self.row_combo.addItem("-- Row --", "")
+        for rw in range(1, 5):
+            self.row_combo.addItem(f"Row {rw}", str(rw))
+
+        self.col_combo = QComboBox()
+        self.col_combo.addItem("-- Col --", "")
+        for c in range(1, 3):
+            self.col_combo.addItem(f"Col {c}", str(c))
+
+        loc_picker_layout.addWidget(self.rack_combo)
+        loc_picker_layout.addWidget(self.row_combo)
+        loc_picker_layout.addWidget(self.col_combo)
+
+        self.rack_combo.currentIndexChanged.connect(self._on_location_combo_changed)
+        self.row_combo.currentIndexChanged.connect(self._on_location_combo_changed)
+        self.col_combo.currentIndexChanged.connect(self._on_location_combo_changed)
+
+        self.location_input = QLineEdit()
+        self.location_input.setPlaceholderText("e.g. R3-2-1 (or custom free text)")
+
+        loc_vbox.addLayout(loc_picker_layout)
+        loc_vbox.addWidget(self.location_input)
+
         self.cost_price = QDoubleSpinBox()
         self.cost_price.setMaximum(100000)
         self.cost_price.setPrefix("$ ")
@@ -96,6 +137,7 @@ class AddEditPartDialog(QDialog):
         form.addRow("Name *:", self.name)
         form.addRow("Category:", self.category)
         form.addRow("Brand:", self.brand)
+        form.addRow("Location:", loc_container)
         form.addRow("Compatible Vehicles:", self.compatible_vehicles)
         form.addRow("Cost Price ($) *:", self.cost_price)
         form.addRow("Selling Price ($) *:", self.selling_price)
@@ -130,6 +172,18 @@ class AddEditPartDialog(QDialog):
 
         layout.addLayout(btn_layout)
 
+    def _on_location_combo_changed(self):
+        rack = self.rack_combo.currentData()
+        row = self.row_combo.currentData()
+        col = self.col_combo.currentData()
+
+        if rack:
+            rw_str = row if row else "1"
+            c_str = col if col else "1"
+            self.location_input.setText(f"R{rack}-{rw_str}-{c_str}")
+        elif not row and not col:
+            self.location_input.clear()
+
     def load_part_data(self):
         self.part_number.setText(self.part.part_number)
         is_admin = bool(self.current_user and self.current_user.is_admin())
@@ -140,6 +194,28 @@ class AddEditPartDialog(QDialog):
         self.category.setText(self.part.category)
         self.brand.setText(self.part.brand)
         self.compatible_vehicles.setText(self.part.compatible_vehicles)
+
+        loc = self.part.location or ""
+        self.location_input.setText(loc)
+        m = re.match(r"^R([1-7])-([1-4])-([1-2])$", loc.strip().upper())
+        if m:
+            r_val, rw_val, c_val = m.groups()
+            r_idx = self.rack_combo.findData(r_val)
+            if r_idx >= 0:
+                self.rack_combo.blockSignals(True)
+                self.rack_combo.setCurrentIndex(r_idx)
+                self.rack_combo.blockSignals(False)
+            rw_idx = self.row_combo.findData(rw_val)
+            if rw_idx >= 0:
+                self.row_combo.blockSignals(True)
+                self.row_combo.setCurrentIndex(rw_idx)
+                self.row_combo.blockSignals(False)
+            c_idx = self.col_combo.findData(c_val)
+            if c_idx >= 0:
+                self.col_combo.blockSignals(True)
+                self.col_combo.setCurrentIndex(c_idx)
+                self.col_combo.blockSignals(False)
+
         self.cost_price.setValue(self.part.cost_price)
         self.selling_price.setValue(self.part.selling_price)
         self.quantity_on_hand.setValue(self.part.quantity_on_hand)
@@ -172,7 +248,8 @@ class AddEditPartDialog(QDialog):
             cost_price=self.cost_price.value(),
             selling_price=self.selling_price.value(),
             reorder_level=self.reorder_level.value(),
-            supplier_id=self.supplier_combo.currentData()
+            supplier_id=self.supplier_combo.currentData(),
+            location=self.location_input.text().strip().upper() or None
         )
         self.part = new_part
         self.accept()
@@ -453,10 +530,17 @@ class InventoryScreen(QWidget):
         self.brand_filter.currentIndexChanged.connect(self.apply_filters)
         toolbar_layout.addWidget(self.brand_filter)
 
+        # Location / Rack Dropdown Filter
+        self.location_filter = QComboBox()
+        self.location_filter.setMinimumWidth(130)
+        self.location_filter.addItem("All Locations", None)
+        self.location_filter.currentIndexChanged.connect(self.apply_filters)
+        toolbar_layout.addWidget(self.location_filter)
+
         # Search Input
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Filter by SKU, name, or vehicle...")
-        self.search_input.setFixedWidth(240)
+        self.search_input.setPlaceholderText("Filter by SKU, name, vehicle, location...")
+        self.search_input.setFixedWidth(260)
         self.search_input.textChanged.connect(self.apply_filters)
         toolbar_layout.addWidget(self.search_input)
 
@@ -510,9 +594,9 @@ class InventoryScreen(QWidget):
         # 3. Modern Data Table
         # -------------------------------------------------------------
         self.table = QTableWidget()
-        self.table.setColumnCount(8)
+        self.table.setColumnCount(9)
         self.table.setHorizontalHeaderLabels([
-            "#", "Part#", "Name", "Category", "Brand", "Price", "Stock", "Actions"
+            "#", "Part#", "Name", "Category", "Brand", "Location", "Price", "Stock", "Actions"
         ])
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -523,11 +607,12 @@ class InventoryScreen(QWidget):
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(7, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(8, QHeaderView.ResizeToContents)
         
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setItemDelegateForColumn(6, StockBadgeDelegate(self.table))
+        self.table.setItemDelegateForColumn(7, StockBadgeDelegate(self.table))
         self.table.verticalHeader().setDefaultSectionSize(40)
 
         layout.addWidget(self.table)
@@ -587,6 +672,7 @@ class InventoryScreen(QWidget):
     def _populate_filter_dropdowns(self):
         current_cat = self.category_filter.currentData()
         current_brand = self.brand_filter.currentData()
+        current_loc = self.location_filter.currentData()
 
         categories = sorted(list(set(p.category for p in self.all_active_parts if p.category)))
         brands = sorted(list(set(p.brand for p in self.all_active_parts if p.brand)))
@@ -613,10 +699,34 @@ class InventoryScreen(QWidget):
                 self.brand_filter.setCurrentIndex(idx)
         self.brand_filter.blockSignals(False)
 
+        self.location_filter.blockSignals(True)
+        self.location_filter.clear()
+        self.location_filter.addItem("All Locations", None)
+        self.location_filter.addItem("Unassigned", "__UNASSIGNED__")
+
+        # Standard Racks 1-7
+        for r in range(1, 8):
+            self.location_filter.addItem(f"Rack {r}", f"R{r}")
+
+        # Any custom non-standard locations present on active parts
+        custom_locs = sorted(list(set(
+            p.location for p in self.all_active_parts
+            if p.location and not re.match(r"^R[1-7](-.*)?$", p.location)
+        )))
+        for cl in custom_locs:
+            self.location_filter.addItem(cl, cl)
+
+        if current_loc is not None:
+            idx = self.location_filter.findData(current_loc)
+            if idx >= 0:
+                self.location_filter.setCurrentIndex(idx)
+        self.location_filter.blockSignals(False)
+
     def apply_filters(self, *args, reset_page=True):
         query = self.search_input.text().strip().lower()
         selected_cat = self.category_filter.currentData()
         selected_brand = self.brand_filter.currentData()
+        selected_loc = self.location_filter.currentData()
 
         filtered = []
         for p in self.all_active_parts:
@@ -626,9 +736,21 @@ class InventoryScreen(QWidget):
             # Brand match
             if selected_brand and p.brand != selected_brand:
                 continue
+            # Location / Rack match
+            if selected_loc:
+                if selected_loc == "__UNASSIGNED__":
+                    if p.location:
+                        continue
+                elif selected_loc.startswith("R") and len(selected_loc) == 2 and selected_loc[1].isdigit():
+                    p_loc = (p.location or "").upper()
+                    if not (p_loc.startswith(selected_loc + "-") or p_loc == selected_loc or f"RACK {selected_loc[1]}" in p_loc):
+                        continue
+                else:
+                    if (p.location or "").upper() != selected_loc.upper():
+                        continue
             # Search query match
             if query:
-                text_corpus = f"{p.part_number} {p.name} {p.brand} {p.category} {p.compatible_vehicles}".lower()
+                text_corpus = f"{p.part_number} {p.name} {p.brand} {p.category} {p.compatible_vehicles} {p.location or ''}".lower()
                 if query not in text_corpus:
                     continue
             filtered.append(p)
@@ -690,6 +812,7 @@ class InventoryScreen(QWidget):
         # Render rows smoothly
         self.table.setUpdatesEnabled(False)
         try:
+            self.table.clearContents()
             self.table.setRowCount(len(page_parts))
             for row, part in enumerate(page_parts):
                 # 0: ROW # INDEX
@@ -714,17 +837,30 @@ class InventoryScreen(QWidget):
                 # 4: BRAND
                 self.table.setItem(row, 4, QTableWidgetItem(part.brand or "—"))
 
-                # 5: UNIT PRICE
+                # 5: LOCATION
+                loc_text = part.location or "—"
+                loc_item = QTableWidgetItem(loc_text)
+                loc_item.setTextAlignment(Qt.AlignCenter)
+                if part.location:
+                    loc_font = QFont()
+                    loc_font.setBold(True)
+                    loc_item.setFont(loc_font)
+                    loc_item.setForeground(QColor("#0F172A"))
+                else:
+                    loc_item.setForeground(QColor("#94A3B8"))
+                self.table.setItem(row, 5, loc_item)
+
+                # 6: UNIT PRICE
                 price_item = QTableWidgetItem(f"${part.selling_price:.2f}")
                 price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                self.table.setItem(row, 5, price_item)
+                self.table.setItem(row, 6, price_item)
 
-                # 6: STOCK (Rendered via StockBadgeDelegate on column 6)
+                # 7: STOCK (Rendered via StockBadgeDelegate on column 7)
                 stock_item = QTableWidgetItem(str(part.quantity_on_hand))
                 stock_item.setData(Qt.UserRole + 1, part.is_low_stock())
-                self.table.setItem(row, 6, stock_item)
+                self.table.setItem(row, 7, stock_item)
 
-                # 7: ACTIONS - Centered, professional, clean ERP styling
+                # 8: ACTIONS - Centered, professional, clean ERP styling
                 action_widget = QWidget()
                 action_layout = QHBoxLayout(action_widget)
                 action_layout.setContentsMargins(4, 2, 4, 2)
@@ -823,7 +959,7 @@ class InventoryScreen(QWidget):
                     set_btn_icon(del_btn, ICON_TRASH, size=13, color='#475569')
                     action_layout.addWidget(del_btn)
 
-                self.table.setCellWidget(row, 7, action_widget)
+                self.table.setCellWidget(row, 8, action_widget)
         finally:
             self.table.setUpdatesEnabled(True)
 
@@ -909,13 +1045,13 @@ class InventoryScreen(QWidget):
             with open(file_path, mode="w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
                 writer.writerow([
-                    "Part Number", "Name", "Category", "Brand", 
+                    "Part Number", "Name", "Category", "Brand", "Location",
                     "Compatible Vehicles", "Cost Price", "Selling Price", 
                     "Stock On Hand", "Reorder Level"
                 ])
                 for p in self.filtered_parts:
                     writer.writerow([
-                        p.part_number, p.name, p.category, p.brand,
+                        p.part_number, p.name, p.category, p.brand, p.location or "",
                         p.compatible_vehicles, f"{p.cost_price:.2f}", f"{p.selling_price:.2f}",
                         p.quantity_on_hand, p.reorder_level
                     ])
