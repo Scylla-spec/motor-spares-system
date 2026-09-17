@@ -1,8 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec for Motor Spares System
-# Run: pyinstaller motor_spares.spec
-
-block_cipher = None
+# PyInstaller spec for Motor Spares System  v2.5.0
+# Run: python -m PyInstaller motor_spares.spec
 
 hidden_imports = [
     'managers',
@@ -34,6 +32,7 @@ hidden_imports = [
 
 datas = [
     ('assets', 'assets'),
+    ('docs', 'docs'),
 ]
 
 a = Analysis(
@@ -43,14 +42,13 @@ a = Analysis(
     datas=datas,
     hiddenimports=hidden_imports,
     hookspath=[],
+    hooksconfig={},
     runtime_hooks=[],
     excludes=['pytest', 'tests', '_pytest'],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
+    noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
@@ -59,9 +57,14 @@ exe = EXE(
     exclude_binaries=True,
     name='MotorSparesSystem',
     debug=False,
+    bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     console=False,
+    disable_windowed_traceback=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
     icon='assets/icons/favicon.ico',
 )
 
@@ -72,5 +75,6 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=True,
+    upx_exclude=[],
     name='MotorSparesSystem',
 )
