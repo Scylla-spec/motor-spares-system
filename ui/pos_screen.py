@@ -126,9 +126,9 @@ class POSScreen(QWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.Fixed)
-        self.results_table.setColumnWidth(5, 148)
+        self.results_table.setColumnWidth(5, 120)
         self.results_table.verticalHeader().setVisible(False)
-        self.results_table.verticalHeader().setDefaultSectionSize(60)
+        self.results_table.verticalHeader().setDefaultSectionSize(48)
         self.results_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.results_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.results_table.setItemDelegateForColumn(4, StockBadgeDelegate(self.results_table))
@@ -332,10 +332,13 @@ class POSScreen(QWidget):
                 # 5: ACTION
                 add_widget = QWidget()
                 add_layout = QHBoxLayout(add_widget)
-                add_layout.setContentsMargins(4, 7, 4, 7)
+                # 7px top+bottom margin inside a 48px row leaves 34px for the
+                # button. 106px wide in a 120px column (7px each side). That
+                # gives a 106×34 shape — solid and balanced, not a pill.
+                add_layout.setContentsMargins(7, 7, 7, 7)
                 add_layout.setAlignment(Qt.AlignCenter)
 
-                _BTN_W, _BTN_H = 136, 46  # identical for both states
+                _BTN_W, _BTN_H = 106, 34  # identical for both states
 
                 if part.quantity_on_hand > 0:
                     add_btn = QPushButton("+ Add")
@@ -346,9 +349,9 @@ class POSScreen(QWidget):
                             background-color: {COLOR_PRIMARY_ORANGE};
                             color: #FFFFFF;
                             font-weight: 700;
-                            font-size: 14px;
+                            font-size: 13px;
                             border: none;
-                            border-radius: 7px;
+                            border-radius: 6px;
                             padding: 0px;
                         }}
                         QPushButton:hover {{
@@ -368,10 +371,10 @@ class POSScreen(QWidget):
                         QPushButton {
                             background-color: #F1F5F9;
                             color: #64748B;
-                            font-weight: 700;
-                            font-size: 13px;
+                            font-weight: 600;
+                            font-size: 11px;
                             border: 1px solid #CBD5E1;
-                            border-radius: 7px;
+                            border-radius: 6px;
                             padding: 0px;
                         }
                     """)
