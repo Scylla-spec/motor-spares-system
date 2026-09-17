@@ -367,6 +367,8 @@ class DashboardWindow(QMainWindow):
                 self.dashboard_screen.refresh()
             elif index == 3 and hasattr(self, 'credit_screen'):
                 self.credit_screen.refresh()
+            elif hasattr(self, 'reports_screen') and self.content_area.widget(index) == self.reports_screen:
+                self.reports_screen.refresh()
 
     def navigate_to_settings(self):
         if self.settings_screen_index is not None:

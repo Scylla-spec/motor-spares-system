@@ -11,7 +11,8 @@ Features:
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-    QMessageBox, QComboBox, QSplitter, QFrame, QInputDialog
+    QMessageBox, QComboBox, QSplitter, QFrame, QInputDialog,
+    QApplication
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QColor
@@ -473,6 +474,8 @@ class POSScreen(QWidget):
         """Reload the full part catalog from the database (picks up newly stocked items)."""
         self.refresh_btn.setText("Refreshing...")
         self.refresh_btn.setEnabled(False)
+        QApplication.processEvents()
+        self.refresh_customers()
         self.perform_search(self.search_input.text())
         self.refresh_btn.setText("Refresh")
         self.refresh_btn.setEnabled(True)

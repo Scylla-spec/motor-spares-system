@@ -51,19 +51,68 @@ class ReportsScreen(QWidget):
             layout.addStretch()
             return
 
-        layout.addWidget(ScreenHeader(
+        header_row = QHBoxLayout()
+        header = ScreenHeader(
             ICON_REPORTS,
             "Reports & Analytics",
             "Sales summaries, stock alerts, profit margins, and reorder planning.",
-        ))
+        )
+        header_row.addWidget(header)
+        header_row.addStretch()
 
-        tabs = QTabWidget()
-        tabs.addTab(self._build_sales_tab(), "Sales Summary")
-        tabs.addTab(self._build_top_sellers_tab(), "Top Sellers")
-        tabs.addTab(self._build_low_stock_tab(), "Low Stock Alert")
-        tabs.addTab(self._build_margin_tab(), "Profit Margins")
-        tabs.addTab(self._build_diagnostic_matrix_tab(), "Diagnostic Health Matrix")
-        layout.addWidget(tabs)
+        self.header_refresh_btn = QPushButton("Refresh")
+        self.header_refresh_btn.setFixedHeight(32)
+        self.header_refresh_btn.setCursor(Qt.PointingHandCursor)
+        self.header_refresh_btn.setToolTip("Reload current report data")
+        self.header_refresh_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #FFFFFF;
+                color: #0F172A;
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 13px;
+                padding: 4px 14px;
+            }}
+            QPushButton:hover {{
+                background-color: #F1F5F9;
+                border-color: #94A3B8;
+            }}
+        """)
+        set_btn_icon(self.header_refresh_btn, ICON_REFRESH, size=14, color='#475569')
+        self.header_refresh_btn.clicked.connect(self.refresh)
+        header_row.addWidget(self.header_refresh_btn)
+
+        layout.addLayout(header_row)
+
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_sales_tab(), "Sales Summary")
+        self.tabs.addTab(self._build_top_sellers_tab(), "Top Sellers")
+        self.tabs.addTab(self._build_low_stock_tab(), "Low Stock Alert")
+        self.tabs.addTab(self._build_margin_tab(), "Profit Margins")
+        self.tabs.addTab(self._build_diagnostic_matrix_tab(), "Diagnostic Health Matrix")
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+        layout.addWidget(self.tabs)
+
+    def _on_tab_changed(self, index: int):
+        self.refresh()
+
+    def refresh(self):
+        """Reload the currently selected report tab."""
+        if not hasattr(self, 'tabs'):
+            return
+        idx = self.tabs.currentIndex()
+        if idx == 0:
+            self.refresh_sales_tab()
+        elif idx == 1:
+            self.load_top_sellers()
+        elif idx == 2:
+            self.load_low_stock()
+        elif idx == 3:
+            self.load_margins()
+        elif idx == 4:
+            self.load_diagnostic_matrix()
+
 
     # ------------------------------------------------------------------ Sales Summary
     # ------------------------------------------------------------------ Sales Summary
@@ -81,6 +130,8 @@ class ReportsScreen(QWidget):
         self.daily_date = QDateEdit(QDate.currentDate())
         self.daily_date.setCalendarPopup(True)
         self.daily_date.setDisplayFormat("yyyy-MM-dd")
+        self.daily_date.setCursor(Qt.PointingHandCursor)
+        self.daily_date.setToolTip("Click calendar icon to select a date")
         self.daily_date.dateChanged.connect(self.run_daily_report)
         controls.addWidget(self.daily_date)
 
@@ -104,6 +155,29 @@ class ReportsScreen(QWidget):
         run_monthly_btn = QPushButton("View Monthly Report")
         run_monthly_btn.clicked.connect(self.run_monthly_report)
         controls.addWidget(run_monthly_btn)
+
+        sales_refresh_btn = QPushButton("Refresh")
+        sales_refresh_btn.setToolTip("Reload sales summary data")
+        sales_refresh_btn.setCursor(Qt.PointingHandCursor)
+        sales_refresh_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #FFFFFF;
+                color: #0F172A;
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 13px;
+                padding: 4px 12px;
+            }}
+            QPushButton:hover {{
+                background-color: #F1F5F9;
+                border-color: #94A3B8;
+            }}
+        """)
+        set_btn_icon(sales_refresh_btn, ICON_REFRESH, size=14, color='#475569')
+        sales_refresh_btn.clicked.connect(self.refresh_sales_tab)
+        controls.addWidget(sales_refresh_btn)
+
         controls.addStretch()
 
         layout.addLayout(controls)
@@ -182,7 +256,14 @@ class ReportsScreen(QWidget):
 
         return w
 
+    def refresh_sales_tab(self):
+        if getattr(self, '_active_sales_mode', 'daily') == 'monthly':
+            self.run_monthly_report()
+        else:
+            self.run_daily_report()
+
     def run_daily_report(self):
+        self._active_sales_mode = "daily"
         d = self.daily_date.date().toString("yyyy-MM-dd")
         result = get_daily_sales_summary(d)
 
@@ -215,6 +296,7 @@ class ReportsScreen(QWidget):
         self.sales_subtabs.setCurrentIndex(0)
 
     def run_monthly_report(self):
+        self._active_sales_mode = "monthly"
         year = self.year_spin.value()
         month = self.month_combo.currentData()
         month_name = self.month_combo.currentText()
@@ -302,6 +384,23 @@ class ReportsScreen(QWidget):
         top_bar.addWidget(self.top_limit)
         top_bar.addWidget(QLabel("best-selling parts"))
         refresh_btn = QPushButton("Refresh")
+        refresh_btn.setCursor(Qt.PointingHandCursor)
+        refresh_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #FFFFFF;
+                color: #0F172A;
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 13px;
+                padding: 4px 12px;
+            }}
+            QPushButton:hover {{
+                background-color: #F1F5F9;
+                border-color: #94A3B8;
+            }}
+        """)
+        set_btn_icon(refresh_btn, ICON_REFRESH, size=14, color='#475569')
         refresh_btn.clicked.connect(self.load_top_sellers)
         top_bar.addWidget(refresh_btn)
         top_bar.addStretch()
@@ -337,6 +436,23 @@ class ReportsScreen(QWidget):
         top_bar = QHBoxLayout()
         top_bar.addWidget(QLabel("Parts at or below their reorder level:"))
         refresh_btn = QPushButton("Refresh")
+        refresh_btn.setCursor(Qt.PointingHandCursor)
+        refresh_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #FFFFFF;
+                color: #0F172A;
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 13px;
+                padding: 4px 12px;
+            }}
+            QPushButton:hover {{
+                background-color: #F1F5F9;
+                border-color: #94A3B8;
+            }}
+        """)
+        set_btn_icon(refresh_btn, ICON_REFRESH, size=14, color='#475569')
         refresh_btn.clicked.connect(self.load_low_stock)
         top_bar.addWidget(refresh_btn)
 
@@ -533,6 +649,23 @@ class ReportsScreen(QWidget):
         top_bar = QHBoxLayout()
         top_bar.addWidget(QLabel("Profit margin per part (based on actual sales):"))
         refresh_btn = QPushButton("Refresh")
+        refresh_btn.setCursor(Qt.PointingHandCursor)
+        refresh_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #FFFFFF;
+                color: #0F172A;
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 13px;
+                padding: 4px 12px;
+            }}
+            QPushButton:hover {{
+                background-color: #F1F5F9;
+                border-color: #94A3B8;
+            }}
+        """)
+        set_btn_icon(refresh_btn, ICON_REFRESH, size=14, color='#475569')
         refresh_btn.clicked.connect(self.load_margins)
         top_bar.addWidget(refresh_btn)
         top_bar.addStretch()
@@ -635,6 +768,7 @@ class ReportsScreen(QWidget):
 
         refresh_matrix_btn = QPushButton("Run Diagnostic")
         refresh_matrix_btn.setFixedHeight(30)
+        refresh_matrix_btn.setCursor(Qt.PointingHandCursor)
         refresh_matrix_btn.clicked.connect(self.load_diagnostic_matrix)
         set_btn_icon(refresh_matrix_btn, ICON_REFRESH, size=13, color='#475569')
 

@@ -6,6 +6,9 @@ Provides modern ERP aesthetics matching the reference design:
 - Modern typography, stat metric cards, filter dropdowns, and pill status badges
 """
 
+import os
+import sys
+
 from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QLineEdit, QComboBox, QStyledItemDelegate
@@ -13,6 +16,29 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QRect, QRectF, Signal, QByteArray, QSize
 from PySide6.QtGui import QColor, QFont, QPainter, QBrush, QPen, QIcon, QPixmap
 from PySide6.QtSvg import QSvgRenderer
+
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    _BASE_DIR = sys._MEIPASS
+else:
+    _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ICONS_DIR = os.path.join(_BASE_DIR, "assets", "icons").replace("\\", "/")
+
+SPIN_UP_SVG = f"{_ICONS_DIR}/spin_up.svg"
+SPIN_DOWN_SVG = f"{_ICONS_DIR}/spin_down.svg"
+CALENDAR_SVG = f"{_ICONS_DIR}/calendar.svg"
+
+# Ensure spin and calendar icons are present
+os.makedirs(os.path.join(_BASE_DIR, "assets", "icons"), exist_ok=True)
+if not os.path.exists(os.path.join(_BASE_DIR, "assets", "icons", "spin_up.svg")):
+    with open(os.path.join(_BASE_DIR, "assets", "icons", "spin_up.svg"), "w", encoding="utf-8") as _f:
+        _f.write('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6" viewBox="0 0 10 6"><polygon points="5,0 10,6 0,6" fill="#0F172A"/></svg>')
+if not os.path.exists(os.path.join(_BASE_DIR, "assets", "icons", "spin_down.svg")):
+    with open(os.path.join(_BASE_DIR, "assets", "icons", "spin_down.svg"), "w", encoding="utf-8") as _f:
+        _f.write('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6" viewBox="0 0 10 6"><polygon points="0,0 10,0 5,6" fill="#0F172A"/></svg>')
+if not os.path.exists(os.path.join(_BASE_DIR, "assets", "icons", "calendar.svg")):
+    with open(os.path.join(_BASE_DIR, "assets", "icons", "calendar.svg"), "w", encoding="utf-8") as _f:
+        _f.write('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>')
+
 
 # --- Color Palette Tokens ---
 COLOR_SIDEBAR_BG = "#0F172A"       # Deep slate navy
@@ -82,70 +108,108 @@ QLineEdit:disabled {{
     border: 1px solid #E2E8F0;
 }}
 
-/* SpinBox & DateEdit with explicit, high-contrast Up (▲) / Down (▼) arrow buttons */
-QSpinBox, QDoubleSpinBox, QDateEdit {{
+/* SpinBox (QSpinBox & QDoubleSpinBox) with explicit, high-contrast Up (▲) / Down (▼) arrow buttons */
+QSpinBox, QDoubleSpinBox {{
     background-color: #FFFFFF;
     color: {COLOR_TEXT_PRIMARY};
     border: 1px solid {COLOR_BORDER};
     border-radius: 6px;
     padding: 4px 28px 4px 8px;
-    min-height: 26px;
+    min-height: 28px;
     font-size: 13px;
 }}
 
-QSpinBox:focus, QDoubleSpinBox:focus, QDateEdit:focus {{
+QSpinBox:focus, QDoubleSpinBox:focus {{
     border: 1px solid {COLOR_PRIMARY_ORANGE};
 }}
 
-QSpinBox::up-button, QDoubleSpinBox::up-button, QDateEdit::up-button {{
+QSpinBox::up-button, QDoubleSpinBox::up-button {{
     subcontrol-origin: border;
     subcontrol-position: top right;
     width: 24px;
-    height: 14px;
-    border-left: 1px solid #CBD5E1;
-    border-bottom: 1px solid #E2E8F0;
+    border-left: 1px solid {COLOR_BORDER};
+    border-bottom: 1px solid {COLOR_BORDER};
     border-top-right-radius: 5px;
     background-color: #F8FAFC;
+    margin: 1px 1px 0px 0px;
 }}
 
-QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover, QDateEdit::up-button:hover {{
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {{
     background-color: #E2E8F0;
-    border-color: #94A3B8;
 }}
 
-QSpinBox::up-arrow, QDoubleSpinBox::up-arrow, QDateEdit::up-arrow {{
-    image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><polygon points='5,0 10,6 0,6' fill='%230F172A'/></svg>");
+QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed {{
+    background-color: #CBD5E1;
+}}
+
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+    image: url("{SPIN_UP_SVG}");
     width: 10px;
     height: 6px;
 }}
 
-QSpinBox::up-button:hover QSpinBox::up-arrow, QDoubleSpinBox::up-button:hover QDoubleSpinBox::up-arrow, QDateEdit::up-button:hover QDateEdit::up-arrow {{
-    image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><polygon points='5,0 10,6 0,6' fill='%230F172A'/></svg>");
-}}
-
-QSpinBox::down-button, QDoubleSpinBox::down-button, QDateEdit::down-button {{
+QSpinBox::down-button, QDoubleSpinBox::down-button {{
     subcontrol-origin: border;
     subcontrol-position: bottom right;
     width: 24px;
-    height: 14px;
-    border-left: 1px solid #CBD5E1;
+    border-left: 1px solid {COLOR_BORDER};
     border-bottom-right-radius: 5px;
     background-color: #F8FAFC;
+    margin: 0px 1px 1px 0px;
 }}
 
-QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover, QDateEdit::down-button:hover {{
+QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
     background-color: #E2E8F0;
-    border-color: #94A3B8;
 }}
 
-QSpinBox::down-arrow, QDoubleSpinBox::down-arrow, QDateEdit::down-arrow {{
-    image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><polygon points='0,0 10,0 5,6' fill='%230F172A'/></svg>");
+QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {{
+    background-color: #CBD5E1;
+}}
+
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+    image: url("{SPIN_DOWN_SVG}");
     width: 10px;
     height: 6px;
 }}
 
-QSpinBox::down-button:hover QSpinBox::down-arrow, QDoubleSpinBox::down-button:hover QSpinBox::down-arrow, QDateEdit::down-button:hover QDateEdit::down-arrow {{
-    image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><polygon points='0,0 10,0 5,6' fill='%23F97316'/></svg>");
+/* DateEdit with explicit Calendar icon button */
+QDateEdit {{
+    background-color: #FFFFFF;
+    color: {COLOR_TEXT_PRIMARY};
+    border: 1px solid {COLOR_BORDER};
+    border-radius: 6px;
+    padding: 4px 32px 4px 8px;
+    min-height: 28px;
+    font-size: 13px;
+}}
+
+QDateEdit:focus {{
+    border: 1px solid {COLOR_PRIMARY_ORANGE};
+}}
+
+QDateEdit::drop-down {{
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 28px;
+    border-left: 1px solid {COLOR_BORDER};
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+    background-color: #F8FAFC;
+    margin: 1px 1px 1px 0px;
+}}
+
+QDateEdit::drop-down:hover {{
+    background-color: #E2E8F0;
+}}
+
+QDateEdit::drop-down:pressed {{
+    background-color: #CBD5E1;
+}}
+
+QDateEdit::down-arrow {{
+    image: url("{CALENDAR_SVG}");
+    width: 16px;
+    height: 16px;
 }}
 
 /* Combo Box */
