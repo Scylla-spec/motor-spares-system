@@ -131,7 +131,6 @@ def initialize_database():
         # Search Indexes for Part
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_part_category ON Part(category);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_part_brand ON Part(brand);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_part_location ON Part(location);")
 
         # 5. StockMovement Table
         cursor.execute("""

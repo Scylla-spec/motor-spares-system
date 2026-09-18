@@ -261,8 +261,8 @@ class BaseImportDialog(QDialog):
             errors = []
             if row.get("cost_price", 0) < 0:
                 errors.append("Cost price cannot be negative.")
-            if row.get("selling_price", 0) <= 0:
-                errors.append("Selling price must be greater than 0.")
+            if row.get("selling_price", 0) < 0:
+                errors.append("Selling price cannot be negative.")
             row["_errors"] = errors
 
             # Refresh warnings for still-missing required-ish fields

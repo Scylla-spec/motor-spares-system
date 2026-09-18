@@ -21,8 +21,8 @@ from PySide6.QtGui import QColor, QFont
 from models.part import Part
 from models.user import User
 from managers.inventory_manager import (
-    get_all_parts, search_parts, add_part, update_part, record_stock_in,
-    record_stock_adjustment, deactivate_part
+    get_all_parts, search_parts, add_part, add_part_detailed, update_part, update_part_detailed,
+    record_stock_in, record_stock_adjustment, deactivate_part
 )
 from managers.supplier_manager import get_all_suppliers
 from ui.excel_import_dialog import ExcelImportDialog
@@ -664,6 +664,7 @@ class InventoryScreen(QWidget):
         layout.addLayout(footer_layout)
 
     def load_inventory(self, preserve_page=False):
+        scroll_pos = self.table.verticalScrollBar().value() if preserve_page and hasattr(self, "table") else 0
         parts = get_all_parts()
         # Filter out deactivated parts
         self.all_active_parts = [p for p in parts if not p.name.startswith("[DEACTIVATED]")]
@@ -672,7 +673,7 @@ class InventoryScreen(QWidget):
         self._populate_filter_dropdowns()
         
         # Apply filters & display
-        self.apply_filters(reset_page=not preserve_page)
+        self.apply_filters(reset_page=not preserve_page, scroll_pos=scroll_pos)
 
     def _populate_filter_dropdowns(self):
         current_cat = self.category_filter.currentData()
@@ -727,7 +728,7 @@ class InventoryScreen(QWidget):
                 self.location_filter.setCurrentIndex(idx)
         self.location_filter.blockSignals(False)
 
-    def apply_filters(self, *args, reset_page=True):
+    def apply_filters(self, *args, reset_page=True, scroll_pos=0):
         query = self.search_input.text().strip().lower()
         selected_cat = self.category_filter.currentData()
         selected_brand = self.brand_filter.currentData()
@@ -761,10 +762,27 @@ class InventoryScreen(QWidget):
             filtered.append(p)
 
         self.filtered_parts = filtered
+        if query:
+            q_upper = query.upper()
+            def sort_key(p):
+                pn = (p.part_number or "").upper()
+                nm = (p.name or "").upper()
+                if pn == q_upper:
+                    return (1, pn)
+                elif pn.startswith(q_upper):
+                    return (2, pn)
+                elif q_upper in pn:
+                    return (3, pn)
+                elif nm == q_upper:
+                    return (4, pn)
+                else:
+                    return (5, pn)
+            self.filtered_parts.sort(key=sort_key)
+
         if reset_page:
             self.current_page = 1
         self.update_kpi_cards()
-        self.render_table_page()
+        self.render_table_page(scroll_pos=scroll_pos if not reset_page else 0)
 
     def update_kpi_cards(self):
         total_skus = len(self.all_active_parts)
@@ -784,7 +802,7 @@ class InventoryScreen(QWidget):
 
     PAGE_SIZE = 100
 
-    def render_table_page(self):
+    def render_table_page(self, scroll_pos=0):
         total_items = len(self.filtered_parts)
         total_pages = max(1, (total_items + self.PAGE_SIZE - 1) // self.PAGE_SIZE)
 
@@ -967,6 +985,8 @@ class InventoryScreen(QWidget):
                 self.table.setCellWidget(row, 8, action_widget)
         finally:
             self.table.setUpdatesEnabled(True)
+            if scroll_pos > 0:
+                self.table.verticalScrollBar().setValue(scroll_pos)
 
     def prev_page(self):
         if self.current_page > 1:
@@ -996,20 +1016,21 @@ class InventoryScreen(QWidget):
     def open_add_dialog(self):
         dialog = AddEditPartDialog(self, current_user=self.current_user)
         if dialog.exec():
-            success = add_part(dialog.part)
+            success, err_msg = add_part_detailed(dialog.part)
             if success:
-                self.load_inventory()
+                self.load_inventory(preserve_page=True)
+                QMessageBox.information(self, "Success", f"Part '{dialog.part.part_number}' added successfully.")
             else:
-                QMessageBox.critical(self, "Error", "Failed to add part. Check if Part Number is unique.")
+                QMessageBox.critical(self, "Error Adding Part", f"Failed to add part:\n\n{err_msg}")
 
     def open_edit_dialog(self, part):
         dialog = AddEditPartDialog(self, part, current_user=self.current_user)
         if dialog.exec():
-            success = update_part(dialog.part, self.current_user.user_id)
+            success, err_msg = update_part_detailed(dialog.part, self.current_user.user_id)
             if success:
                 self.load_inventory(preserve_page=True)
             else:
-                QMessageBox.critical(self, "Error", "Failed to update part. Check if Part Number is already taken.")
+                QMessageBox.critical(self, "Error Updating Part", f"Failed to update part:\n\n{err_msg}")
 
     def open_stock_in_dialog(self, part):
         dialog = StockInDialog(self, part)

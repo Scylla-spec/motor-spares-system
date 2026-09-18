@@ -37,9 +37,9 @@ def validate_part(part_number: str, name: str, cost_price: float, selling_price:
         return False, "Part name is required."
     if cost_price < 0:
         return False, "Cost price cannot be negative."
-    if selling_price <= 0:
-        return False, "Selling price must be greater than 0."
-    if selling_price < cost_price:
+    if selling_price < 0:
+        return False, "Selling price cannot be negative."
+    if selling_price > 0 and selling_price < cost_price:
         return False, "Selling price must be greater than or equal to cost price."
     return True, ""
 

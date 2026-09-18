@@ -113,3 +113,38 @@ def test_update_part_quantity_updates_stock_and_logs(test_db, admin_user):
     assert ok is True
     updated = get_all_parts()[0]
     assert updated.quantity_on_hand == 25
+
+
+def test_add_part_zero_price_allowed(test_db):
+    part = _make_part(part_number="ZERO-001", cost_price=0.0, selling_price=0.0)
+    ok = add_part(part)
+    assert ok is True
+    retrieved = get_all_parts()[0]
+    assert retrieved.cost_price == 0.0
+    assert retrieved.selling_price == 0.0
+
+
+def test_add_part_reuses_deactivated_part_number(test_db, admin_user):
+    # Add a part and then deactivate it
+    add_part(_make_part(part_number="REUSE-001", name="Old Part"))
+    part_id = get_all_parts()[0].part_id
+    deactivate_part(part_id, user_id=admin_user.user_id)
+
+    # Adding a new active part with the same part_number should succeed
+    new_part = _make_part(part_number="REUSE-001", name="New Replacement Part")
+    ok = add_part(new_part)
+    assert ok is True
+    active_parts = get_all_parts()
+    assert len(active_parts) == 1
+    assert active_parts[0].name == "NEW REPLACEMENT PART"
+    assert active_parts[0].part_number == "REUSE-001"
+
+
+def test_add_part_duplicate_active_part_number_fails(test_db):
+    add_part(_make_part(part_number="ACTIVE-100"))
+    
+    # Same part_number with different casing & leading/trailing whitespace
+    duplicate_part = _make_part(part_number=" active-100 ")
+    ok = add_part(duplicate_part)
+    assert ok is False
+    assert len(get_all_parts()) == 1

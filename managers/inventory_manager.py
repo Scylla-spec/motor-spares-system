@@ -8,8 +8,8 @@ from models.stock_movement import StockMovement
 from typing import List, Optional, Tuple
 from utils.validators import normalize_part_number, normalize_category
 
-def add_part(part: Part) -> bool:
-    """Adds a new part to the inventory."""
+def add_part_detailed(part: Part) -> Tuple[bool, str]:
+    """Adds a new part to the inventory and returns (success: bool, detail_message: str)."""
     part.part_number = normalize_part_number(part.part_number)
     part.name = (part.name or "").strip().upper()
     part.category = normalize_category(part.category)
@@ -20,6 +20,30 @@ def add_part(part: Part) -> bool:
     conn = get_connection()
     cursor = conn.cursor()
     try:
+        # Check if an ACTIVE part with the same part_number already exists (case & whitespace insensitive)
+        cursor.execute("""
+            SELECT part_id, part_number, name FROM Part 
+            WHERE UPPER(TRIM(part_number)) = UPPER(TRIM(?))
+              AND name NOT LIKE '[DEACTIVATED]%'
+        """, (part.part_number,))
+        active_match = cursor.fetchone()
+        if active_match:
+            msg = f"Part Number '{part.part_number}' is already taken by active item '{active_match['name']}' (ID: {active_match['part_id']})."
+            logging.warning(f"Failed to add part: {msg}")
+            return False, msg
+
+        # If deactivated parts exist with this part_number, rename them to release the unique constraint
+        cursor.execute("""
+            SELECT part_id, part_number FROM Part 
+            WHERE UPPER(TRIM(part_number)) = UPPER(TRIM(?))
+              AND name LIKE '[DEACTIVATED]%'
+        """, (part.part_number,))
+        for d_row in cursor.fetchall():
+            d_id = d_row["part_id"]
+            d_pn = d_row["part_number"]
+            new_d_pn = f"[DEACTIVATED_{d_id}] {d_pn}" if not d_pn.startswith("[DEACTIVATED") else f"{d_pn}_{d_id}"
+            cursor.execute("UPDATE Part SET part_number = ? WHERE part_id = ?", (new_d_pn, d_id))
+
         cursor.execute("""
             INSERT INTO Part (
                 part_number, name, category, brand, compatible_vehicles, 
@@ -34,24 +58,35 @@ def add_part(part: Part) -> bool:
         ))
         conn.commit()
         
-        # Note: If adding initial stock > 0, we should record a movement, 
-        # but for simplicity, usually initial load is just set.
+        part.part_id = cursor.lastrowid
         if part.quantity_on_hand > 0:
-            part.part_id = cursor.lastrowid
             _record_stock_movement(cursor, part.part_id, 'IN', part.quantity_on_hand, 'Initial Stock')
             conn.commit()
 
-        logging.info(f"Part '{part.part_number}' added successfully.")
-        return True
-    except sqlite3.IntegrityError:
-        logging.warning(f"Failed to add part: Duplicate part_number '{part.part_number}'.")
-        return False
+        logging.info(f"Part '{part.part_number}' added successfully (ID: {part.part_id}).")
+        return True, f"Part '{part.part_number}' added successfully."
+    except sqlite3.IntegrityError as e:
+        msg = f"Database Integrity Error: {e}"
+        logging.warning(f"Failed to add part '{part.part_number}': {msg}")
+        return False, msg
     except sqlite3.Error as e:
-        logging.error(f"Database error adding part: {e}")
+        msg = f"Database Error: {e}"
+        logging.error(f"Error adding part '{part.part_number}': {msg}")
         conn.rollback()
-        return False
+        return False, msg
+    except Exception as e:
+        msg = f"Unexpected Error: {e}"
+        logging.error(f"Error adding part '{part.part_number}': {msg}")
+        conn.rollback()
+        return False, msg
     finally:
         conn.close()
+
+
+def add_part(part: Part) -> bool:
+    """Adds a new part to the inventory (returns bool for simple callers/tests)."""
+    ok, _ = add_part_detailed(part)
+    return ok
 
 
 def bulk_update_category_prices(category_name: str, percentage_change: float) -> Tuple[bool, int]:
@@ -79,8 +114,8 @@ def bulk_update_category_prices(category_name: str, percentage_change: float) ->
         conn.close()
 
 
-def update_part(part: Part, user_id: int) -> bool:
-    """Updates an existing part. Logs price changes and stock quantity changes."""
+def update_part_detailed(part: Part, user_id: int) -> Tuple[bool, str]:
+    """Updates an existing part and returns (success: bool, detail_message: str)."""
     part.part_number = normalize_part_number(part.part_number)
     part.name = (part.name or "").strip().upper()
     part.category = normalize_category(part.category)
@@ -91,18 +126,38 @@ def update_part(part: Part, user_id: int) -> bool:
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        # Check if part_number changed and if it is already taken by another part
-        cursor.execute("SELECT part_id FROM Part WHERE part_number = ? AND part_id != ?", (part.part_number, part.part_id))
-        if cursor.fetchone():
-            logging.warning(f"Cannot update part {part.part_id}: part_number '{part.part_number}' already exists.")
-            return False
+        # Check if part_number changed and if it is already taken by another ACTIVE part (case & whitespace insensitive)
+        cursor.execute("""
+            SELECT part_id, name FROM Part 
+            WHERE UPPER(TRIM(part_number)) = UPPER(TRIM(?))
+              AND part_id != ?
+              AND name NOT LIKE '[DEACTIVATED]%'
+        """, (part.part_number, part.part_id))
+        active_match = cursor.fetchone()
+        if active_match:
+            msg = f"Cannot update part: Part Number '{part.part_number}' is already taken by active item '{active_match['name']}' (ID: {active_match['part_id']})."
+            logging.warning(msg)
+            return False, msg
+
+        # If deactivated parts (other than this one) exist with this part_number, rename them to release the unique constraint
+        cursor.execute("""
+            SELECT part_id, part_number FROM Part 
+            WHERE UPPER(TRIM(part_number)) = UPPER(TRIM(?))
+              AND part_id != ?
+              AND name LIKE '[DEACTIVATED]%'
+        """, (part.part_number, part.part_id))
+        for d_row in cursor.fetchall():
+            d_id = d_row["part_id"]
+            d_pn = d_row["part_number"]
+            new_d_pn = f"[DEACTIVATED_{d_id}] {d_pn}" if not d_pn.startswith("[DEACTIVATED") else f"{d_pn}_{d_id}"
+            cursor.execute("UPDATE Part SET part_number = ? WHERE part_id = ?", (new_d_pn, d_id))
 
         # Fetch old prices and stock to see if we need to audit
         cursor.execute("SELECT cost_price, selling_price, quantity_on_hand FROM Part WHERE part_id = ?", (part.part_id,))
         old_record = cursor.fetchone()
         
         if not old_record:
-            return False
+            return False, f"Part ID {part.part_id} not found in database."
 
         old_cost = old_record["cost_price"]
         old_selling = old_record["selling_price"]
@@ -155,13 +210,29 @@ def update_part(part: Part, user_id: int) -> bool:
             ))
 
         conn.commit()
-        return True
+        return True, f"Part '{part.part_number}' updated successfully."
+    except sqlite3.IntegrityError as e:
+        msg = f"Database Integrity Error updating part: {e}"
+        logging.warning(msg)
+        return False, msg
     except sqlite3.Error as e:
-        logging.error(f"Database error updating part {part.part_id}: {e}")
+        msg = f"Database Error updating part: {e}"
+        logging.error(msg)
         conn.rollback()
-        return False
+        return False, msg
+    except Exception as e:
+        msg = f"Unexpected Error updating part: {e}"
+        logging.error(msg)
+        conn.rollback()
+        return False, msg
     finally:
         conn.close()
+
+
+def update_part(part: Part, user_id: int) -> bool:
+    """Updates an existing part (returns bool for simple callers/tests)."""
+    ok, _ = update_part_detailed(part, user_id)
+    return ok
 
 
 def get_all_parts(include_inactive: bool = False) -> List[Part]:
@@ -193,25 +264,40 @@ def get_all_parts(include_inactive: bool = False) -> List[Part]:
 def search_parts(query: str, include_inactive: bool = False) -> List[Part]:
     """Searches parts by number, name, category, or brand.
 
-    Excludes deactivated parts by default (BR-02) — critically, this means
-    a deactivated part can no longer be found and sold through POS.
+    Excludes deactivated parts by default (BR-02).
+    Results are sorted so exact part_number matches appear first, followed by
+    part_number prefix matches, substring matches, and name matches.
     """
     conn = get_connection()
     cursor = conn.cursor()
     parts = []
-    search_term = f"%{query}%"
+    clean_q = (query or "").strip()
+    search_term = f"%{clean_q}%"
     try:
+        order_clause = """
+            ORDER BY 
+                CASE 
+                    WHEN UPPER(TRIM(part_number)) = UPPER(?) THEN 1
+                    WHEN UPPER(TRIM(part_number)) LIKE UPPER(?) || '%' THEN 2
+                    WHEN UPPER(TRIM(part_number)) LIKE '%' || UPPER(?) || '%' THEN 3
+                    WHEN UPPER(TRIM(name)) = UPPER(?) THEN 4
+                    ELSE 5
+                END,
+                part_number ASC
+        """
         if include_inactive:
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT * FROM Part
                 WHERE part_number LIKE ? OR name LIKE ? OR category LIKE ? OR brand LIKE ? OR location LIKE ?
-            """, (search_term, search_term, search_term, search_term, search_term))
+                {order_clause}
+            """, (search_term, search_term, search_term, search_term, search_term, clean_q, clean_q, clean_q, clean_q))
         else:
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT * FROM Part
                 WHERE (part_number LIKE ? OR name LIKE ? OR category LIKE ? OR brand LIKE ? OR location LIKE ?)
                   AND name NOT LIKE '[DEACTIVATED]%'
-            """, (search_term, search_term, search_term, search_term, search_term))
+                {order_clause}
+            """, (search_term, search_term, search_term, search_term, search_term, clean_q, clean_q, clean_q, clean_q))
 
         for row in cursor.fetchall():
             parts.append(_row_to_part(row))
@@ -312,18 +398,20 @@ def deactivate_part(part_id: int, user_id: int) -> bool:
     cursor = conn.cursor()
     timestamp = datetime.now().isoformat()
     try:
-        cursor.execute("SELECT name FROM Part WHERE part_id = ?", (part_id,))
+        cursor.execute("SELECT name, part_number FROM Part WHERE part_id = ?", (part_id,))
         row = cursor.fetchone()
         if not row:
             return False
             
         old_name = row["name"]
+        old_pn = row["part_number"]
         if old_name.startswith("[DEACTIVATED]"):
             return True # already deactivated
             
         new_name = f"[DEACTIVATED] {old_name}"
+        new_pn = f"[DEACTIVATED_{part_id}] {old_pn}" if not old_pn.startswith("[DEACTIVATED") else old_pn
         
-        cursor.execute("UPDATE Part SET name = ? WHERE part_id = ?", (new_name, part_id))
+        cursor.execute("UPDATE Part SET name = ?, part_number = ? WHERE part_id = ?", (new_name, new_pn, part_id))
         
         # Audit deactivation
         cursor.execute("""

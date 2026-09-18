@@ -340,8 +340,8 @@ def auto_correct_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         errors = []
         if clean.get("cost_price", 0) < 0:
             errors.append("Cost price cannot be negative.")
-        if clean.get("selling_price", 0) <= 0:
-            errors.append("Selling price must be greater than 0.")
+        if clean.get("selling_price", 0) < 0:
+            errors.append("Selling price cannot be negative.")
 
         clean["_warnings"] = warnings
         clean["_corrections"] = corrections
@@ -352,24 +352,28 @@ def auto_correct_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def _find_existing_part(part_number: str, name: str):
     """
-    Looks for an existing active part that matches by part_number first,
-    then by name (case-insensitive). Returns the Part object or None.
-    Used by import_parts_from_rows to detect duplicates before inserting.
+    Looks for an existing active part that matches by part_number first.
+    Only matches by name if part_number is empty/missing, to avoid confusing
+    distinct part numbers (e.g. G580 vs DG580) that share identical/similar names.
+    Returns the Part object or None.
     """
-    from managers.inventory_manager import search_parts
+    from managers.inventory_manager import get_all_parts
     pn = (part_number or "").strip().upper()
     nm = (name or "").strip().lower()
 
+    all_active = get_all_parts()
+
     if pn:
-        results = search_parts(pn)
-        for p in results:
-            if p.part_number.upper() == pn:
+        for p in all_active:
+            if (p.part_number or "").strip().upper() == pn:
                 return p
+        # If a part_number was specified, do not fall back to name matching,
+        # because different part numbers (e.g. G580 vs DG580) must remain separate.
+        return None
 
     if nm:
-        results = search_parts(nm)
-        for p in results:
-            if p.name.strip().lower() == nm:
+        for p in all_active:
+            if (p.name or "").strip().lower() == nm:
                 return p
 
     return None
@@ -403,8 +407,8 @@ def import_parts_from_rows(corrected: List[Dict[str, Any]], parse_warnings: List
             skipped += 1
             continue
 
-        if row.get("selling_price", 0.0) <= 0:
-            all_errors.append(f"Row {i} ({row.get('part_number','?')}): Selling price must be greater than 0 — skipped.")
+        if row.get("selling_price", 0.0) < 0:
+            all_errors.append(f"Row {i} ({row.get('part_number','?')}): Selling price cannot be negative — skipped.")
             skipped += 1
             continue
 
