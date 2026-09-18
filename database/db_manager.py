@@ -286,6 +286,7 @@ def initialize_database():
             "phone": "+263 77 123 4567",
             "receipt_footer": "Thank you for your business!",
             "logo_path": "",
+            "usd_zar_rate": "18.50",
         }
         for key, value in default_settings.items():
             cursor.execute(
@@ -315,6 +316,22 @@ def initialize_database():
         if "location" not in part_columns:
             cursor.execute("ALTER TABLE Part ADD COLUMN location TEXT;")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_part_location ON Part(location);")
+
+        # --- Migration: add multi-currency columns to Sale if missing ---
+        cursor.execute("PRAGMA table_info(Sale);")
+        sale_columns = {row[1] for row in cursor.fetchall()}
+        if "currency" not in sale_columns:
+            cursor.execute("ALTER TABLE Sale ADD COLUMN currency TEXT DEFAULT 'USD';")
+        if "exchange_rate" not in sale_columns:
+            cursor.execute("ALTER TABLE Sale ADD COLUMN exchange_rate REAL DEFAULT 1.0;")
+        if "amount_paid_curr" not in sale_columns:
+            cursor.execute("ALTER TABLE Sale ADD COLUMN amount_paid_curr REAL;")
+
+        # --- Migration: add original_unit_price to SaleItem if missing ---
+        cursor.execute("PRAGMA table_info(SaleItem);")
+        sale_item_columns = {row[1] for row in cursor.fetchall()}
+        if "original_unit_price" not in sale_item_columns:
+            cursor.execute("ALTER TABLE SaleItem ADD COLUMN original_unit_price REAL;")
 
         conn.commit()
         logging.info("Database schema initialized successfully.")

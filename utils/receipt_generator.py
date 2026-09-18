@@ -11,6 +11,8 @@ RECEIPTS_DIR = "receipts"
 def generate_pdf_receipt(sale: Sale, receipt_number: str, cashier_name: str, customer_name: str = "Walk-in") -> str:
     """
     Generates a PDF receipt for a sale and saves it to the receipts directory.
+    Supports multi-currency sales — if sale.currency != 'USD', the settlement
+    currency, exchange rate, and converted total are printed on the receipt.
     Returns the absolute path to the generated PDF.
     """
     os.makedirs(RECEIPTS_DIR, exist_ok=True)
@@ -18,6 +20,17 @@ def generate_pdf_receipt(sale: Sale, receipt_number: str, cashier_name: str, cus
     filepath = os.path.join(RECEIPTS_DIR, filename)
 
     settings = get_all_settings()
+
+    # Resolve currency display helpers
+    currency = getattr(sale, "currency", "USD") or "USD"
+    exchange_rate = getattr(sale, "exchange_rate", 1.0) or 1.0
+    amount_paid_curr = getattr(sale, "amount_paid_curr", None)
+
+    def _curr_symbol(cur: str) -> str:
+        return {"USD": "$", "ZAR": "R ", "ZIG": ""}.get(cur.upper(), "")
+
+    def _curr_suffix(cur: str) -> str:
+        return {"USD": "", "ZAR": " ZAR", "ZIG": " ZiG"}.get(cur.upper(), f" {cur}")
 
     try:
         c = canvas.Canvas(filepath, pagesize=letter)
@@ -65,14 +78,29 @@ def generate_pdf_receipt(sale: Sale, receipt_number: str, cashier_name: str, cus
         y -= 20
         c.setFont("Helvetica", 10)
         for item in sale.items:
-            # Handle long names slightly by truncating
-            display_name = f"{item.part_number} - {item.part_name}"[:40] 
+            # Flag negotiated prices visually
+            negotiated_marker = ""
+            if getattr(item, "was_negotiated", False):
+                orig = item.original_unit_price or item.unit_price
+                negotiated_marker = f" (Neg. from ${orig:.2f})"
+
+            display_name = f"{item.part_number} - {item.part_name}"[:38]
             
             c.drawString(50, y, display_name)
             c.drawString(300, y, str(item.quantity))
-            c.drawString(380, y, f"${item.unit_price:.2f}")
+            c.drawString(380, y, f"${item.unit_price:.2f}{negotiated_marker[:16]}")
             c.drawString(480, y, f"${item.subtotal:.2f}")
             y -= 15
+
+            # If negotiated, print the original price note on the next line
+            if getattr(item, "was_negotiated", False):
+                c.setFont("Helvetica-Oblique", 8)
+                c.setFillColorRGB(0.6, 0.3, 0.0)
+                orig = item.original_unit_price or item.unit_price
+                c.drawString(380, y, f"  List: ${orig:.2f}")
+                c.setFillColorRGB(0, 0, 0)
+                c.setFont("Helvetica", 10)
+                y -= 12
             
             # Prevent falling off page
             if y < 100:
@@ -80,18 +108,33 @@ def generate_pdf_receipt(sale: Sale, receipt_number: str, cashier_name: str, cus
                 y = height - 50
                 c.setFont("Helvetica", 10)
                 
-        # Totals
+        # Totals section
         c.line(50, y - 5, 550, y - 5)
         y -= 25
         
         c.setFont("Helvetica-Bold", 12)
-        c.drawString(380, y, "Total Amount:")
+        c.drawString(380, y, "Total (USD):")
         c.drawString(480, y, f"${sale.total_amount:.2f}")
         
         y -= 15
         c.setFont("Helvetica", 10)
         c.drawString(380, y, "Payment Method:")
         c.drawString(480, y, sale.payment_method)
+
+        # Multi-currency note — only shown when settlement was not USD
+        if currency.upper() != "USD" and amount_paid_curr is not None:
+            y -= 18
+            sym = _curr_symbol(currency)
+            suf = _curr_suffix(currency)
+            c.setFont("Helvetica-Bold", 10)
+            c.setFillColorRGB(0.1, 0.3, 0.6)
+            c.drawString(50, y, f"Settlement Currency: {currency.upper()}")
+            y -= 14
+            c.setFont("Helvetica", 9)
+            c.drawString(50, y, f"Applied Rate:  1 USD = {exchange_rate:.4f} {currency.upper()}")
+            y -= 12
+            c.drawString(50, y, f"Amount Charged:  {sym}{amount_paid_curr:,.2f}{suf}")
+            c.setFillColorRGB(0, 0, 0)
         
         # Footer
         c.setFont("Helvetica-Oblique", 10)
@@ -125,3 +168,5 @@ def generate_pdf_receipt(sale: Sale, receipt_number: str, cashier_name: str, cus
     except Exception as e:
         logging.error(f"Failed to generate receipt {receipt_number}: {e}")
         return ""
+
+
